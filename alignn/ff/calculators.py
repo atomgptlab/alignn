@@ -262,6 +262,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     torch.load(
                         os.path.join(path, model_filename),
                         map_location=self.device,
+                        weights_only=False,
                     )
                 )
             else:
@@ -269,6 +270,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     torch.load(
                         os.path.join(path, model_filename),
                         map_location=self.device,
+                        weights_only=False,
                     )["model"]
                 )
             model.to(device)
@@ -445,6 +447,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             torch.load(
                 os.path.join(ff_path, ff_model_filename),
                 map_location=self.device,
+                weights_only=False,
             )
         )
         ff_model.eval()
@@ -466,6 +469,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             torch.load(
                 os.path.join(prop_path, prop_model_filename),
                 map_location=self.device,
+                weights_only=False,
             )
         )
         prop_model.eval()
