@@ -484,6 +484,8 @@ NIST-MGI (https://www.nist.gov/mgi)
 
 NIST-CHIPS (https://www.nist.gov/chips)
 
+Note: This project was originally developed under the github.com/usnistgov organization and is now maintained here by the lead developer.
+
 Code of conduct
 --------------------
 
