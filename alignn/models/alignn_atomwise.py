@@ -81,8 +81,110 @@ class ALIGNNAtomWiseConfig(BaseSettings):
 
         env_prefix = "jv_model"
 
-
 class NodeAttentionLayer(nn.Module):
+    """
+    BIG-PAPER N-ALIGNN
+    Multi-head, edge-aware, force-safe.
+    """
+
+    def __init__(self, hidden_dim, num_heads=4):
+        super().__init__()
+
+        assert hidden_dim % num_heads == 0
+
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+
+        self.q_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.k_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.v_proj = nn.Linear(hidden_dim, hidden_dim)
+
+        self.edge_bias = nn.Linear(hidden_dim, num_heads)
+
+        self.out_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.norm = nn.LayerNorm(hidden_dim)
+
+    def forward(self, g, x, edge_feat):
+        with g.local_scope():
+
+            Q = self.q_proj(x).view(-1, self.num_heads, self.head_dim)
+            K = self.k_proj(x).view(-1, self.num_heads, self.head_dim)
+            V = self.v_proj(x).view(-1, self.num_heads, self.head_dim)
+
+            g.ndata["Q"] = Q
+            g.ndata["K"] = K
+            g.ndata["V"] = V
+
+            # edge-aware bias
+            edge_bias = self.edge_bias(edge_feat)  # (E, heads)
+            g.edata["bias"] = edge_bias
+
+            g.apply_edges(fn.u_dot_v("Q", "K", "score"))
+
+            score = g.edata["score"] / np.sqrt(self.head_dim)
+            score = score + g.edata["bias"].unsqueeze(-1)
+
+            alpha = edge_softmax(g, score)
+
+            g.edata["alpha"] = alpha
+
+            g.update_all(
+                fn.u_mul_e("V", "alpha", "m"),
+                fn.sum("m", "h_attn"),
+            )
+
+            h = g.ndata["h_attn"].reshape(-1, self.hidden_dim)
+            h = self.out_proj(h)
+
+            return self.norm(x + h)
+
+class SelfAttentionLayer(nn.Module):
+    """
+    BIG-PAPER T-ALIGNN
+    Pre-norm transformer block.
+    """
+
+    def __init__(self, hidden_dim, num_heads=4):
+        super().__init__()
+
+        self.norm1 = nn.LayerNorm(hidden_dim)
+
+        self.mha = nn.MultiheadAttention(
+            embed_dim=hidden_dim,
+            num_heads=num_heads,
+            batch_first=True,
+        )
+
+        self.norm2 = nn.LayerNorm(hidden_dim)
+
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim * 4),
+            nn.SiLU(),
+            nn.Linear(hidden_dim * 4, hidden_dim),
+        )
+
+    def forward(self, x, batch_nodes):
+
+        outputs = []
+        start = 0
+
+        for n in batch_nodes.tolist():
+            h = x[start:start + n].unsqueeze(0)
+
+            h_norm = self.norm1(h)
+            attn_out, _ = self.mha(h_norm, h_norm, h_norm)
+            h = h + attn_out
+
+            h_norm = self.norm2(h)
+            h = h + self.ffn(h_norm)
+
+            outputs.append(h.squeeze(0))
+            start += n
+
+        return torch.cat(outputs, dim=0)
+
+class NodeAttentionLayerX(nn.Module):
     """
     N-ALIGNN: Local graph attention over neighbors.
     Lightweight GAT-style but ALIGNN-compatible.
@@ -90,6 +192,7 @@ class NodeAttentionLayer(nn.Module):
 
     def __init__(self, hidden_dim, num_heads=4):
         super().__init__()
+        assert hidden_dim % num_heads == 0
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
         self.head_dim = hidden_dim // num_heads
@@ -130,8 +233,26 @@ class NodeAttentionLayer(nn.Module):
 
             return self.norm(x + h)
 
+class DirectionalEdgeEncoder(nn.Module):
+    """
+    Lightweight directional encoding.
+    Makes ALIGNN geometry-aware without full SE(3).
+    """
 
-class SelfAttentionLayer(nn.Module):
+    def __init__(self, hidden_dim):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(3, hidden_dim),
+            nn.SiLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+        )
+
+    def forward(self, r):
+        # r: (E,3)
+        unit_r = r / (torch.norm(r, dim=1, keepdim=True) + 1e-8)
+        return self.mlp(unit_r)
+
+class SelfAttentionLayerX(nn.Module):
     """
     T-ALIGNN: Global transformer attention.
     Works after graph convolutions.
@@ -429,7 +550,7 @@ class ALIGNNAtomWise(nn.Module):
             )
         else:
             self.sal = None
-
+        self.dir_encoder = DirectionalEdgeEncoder(config.hidden_features)
         self.readout = AvgPooling()
 
         if config.extra_features != 0:
@@ -569,9 +690,16 @@ class ALIGNNAtomWise(nn.Module):
                     inner_cutoff=self.config.inner_cutoff,
                     exponent=self.config.exponent,
                 )
-                y = self.edge_embedding(bondlength)
+                y_scalar = self.edge_embedding(bondlength)
+                y_dir = self.dir_encoder(r)
+                y = y_scalar + y_dir
+
+                #y = self.edge_embedding(bondlength)
         else:
-            y = self.edge_embedding(bondlength)
+            y_scalar = self.edge_embedding(bondlength)
+            y_dir = self.dir_encoder(r)
+            y = y_scalar + y_dir
+            #y = self.edge_embedding(bondlength)
         # y = self.edge_embedding(bondlength)
         # ALIGNN updates: update node, edge, triplet features
 
@@ -580,7 +708,8 @@ class ALIGNNAtomWise(nn.Module):
 
             # 🆕 N-ALIGNN
             if self.nal_layers is not None:
-                x = self.nal_layers[i](g, x)
+                x = self.nal_layers[i](g, x,y)
+                #x = self.nal_layers[i](g, x)
 
         for gcn_layer in self.gcn_layers:
             x, y = gcn_layer(g, x, y)
