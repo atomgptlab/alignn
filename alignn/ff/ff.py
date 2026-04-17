@@ -949,13 +949,15 @@ def surface_energy(
     on_conventional_cell=True,
     dataset="dft_3d",
     max_index=None,
-    miller_index=[1, 1, 1],
+    miller_index=None,
     on_relaxed_struct=True,
     model_path=".",
     thickness=25,
     model_filename="best_model.pt",
 ):
     """Get surface energy."""
+    if miller_index is None:
+        miller_index = []
     if atoms is None:
         from jarvis.db.figshare import data
 
@@ -1030,8 +1032,8 @@ def surface_energy(
 def get_interface_energy(
     film_atoms=None,
     subs_atoms=None,
-    film_index=[1, 1, 1],
-    subs_index=[0, 0, 1],
+    film_index=None,
+    subs_index=None,
     film_thickness=25,
     subs_thickness=25,
     model_path="",
@@ -1046,6 +1048,10 @@ def get_interface_energy(
     gpaw_verify=False,
 ):
     """Get work of adhesion."""
+    if film_index is None:
+        film_index = []
+    if subs_index is None:
+        subs_index = []
     film_surf = Surface(
         film_atoms,
         indices=film_index,
@@ -1173,7 +1179,7 @@ def phonons(
     force_mult_natoms=False,
     stress_wt=0.1,
     force_multiplier=1,
-    dim=[2, 2, 2],
+    dim=None,
     freq_conversion_factor=33.3566830,  # ThztoCm-1
     phonopy_bands_figname="phonopy_bands.png",
     # phonopy_dos_figname="phonopy_dos.png",
@@ -1182,6 +1188,8 @@ def phonons(
     distance=0.2,
 ):
     """Make Phonon calculation setup."""
+    if dim is None:
+        dim = []
     if calc is None:
         calc = AlignnAtomwiseCalculator(
             path=model_path,
@@ -1322,12 +1330,14 @@ def phonons3(
     model_path=".",
     model_filename="best_model.pt",
     on_relaxed_struct=False,
-    dim=[2, 2, 2],
+    dim=None,
     distance=0.2,
     stress_wt=0.1,
     force_multiplier=1,
 ):
     """Make Phonon3 calculation setup."""
+    if dim is None:
+        dim = []
     from phono3py import Phono3py
 
     if calc is None:
@@ -1381,9 +1391,9 @@ def phonons3(
 
 
 def ase_phonon(
-    atoms=[],
+    atoms=None,
     N=2,
-    path=[],
+    path=None,
     jid=None,
     calc=None,
     npoints=100,
@@ -1397,6 +1407,10 @@ def ase_phonon(
     force_multiplier=1,
 ):
     """Get phonon bandstructure and DOS using ASE."""
+    if atoms is None:
+        atoms = []
+    if path is None:
+        path = []
     if calc is None:
         calc = AlignnAtomwiseCalculator(
             path=model_path, force_multiplier=force_multiplier
