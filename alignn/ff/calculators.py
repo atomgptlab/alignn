@@ -398,32 +398,34 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         ff_config_filename="config.json",
         ff_config=None,
         stress_wt=0.05,
-        props=[
-            "cbm",
-            "vbm",
-            "gap",
-            "efermi",
-            "optb88vdw_bandgap",
-            "mbj_bandgap",
-            "spillage",
-            "slme",
-            "bulk_modulus_kv",
-            "shear_modulus_gv",
-            "n-Seebeck",
-            "n-powerfact",
-            "avg_elec_mass",
-            "avg_hole_mass",
-            "epsx",
-            "mepsx",
-            "max_efg",
-            "dfpt_piezo_max_dielectric",
-            "dfpt_piezo_max_dij",
-            "exfoliation_energy",
-            "Tc_supercon",
-            "magmom_oszicar",
-        ],
+        props=None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     ):
         """Initialize class."""
+        if props is None:
+            props = []
         super().__init__()
         # super().__init__(**kwargs)
         self.device = device
