@@ -3,7 +3,7 @@
   "dataset": "user_data",
   "target": "target",
   "atom_features": "cgcnn",
-  "neighbor_strategy": "pure_torch",
+  "neighbor_strategy": "radius_graph",
   "id_tag": "jid",
   "random_seed": 123,
   "classification_threshold": null,
@@ -41,7 +41,7 @@
   "n_early_stopping": null,
   "output_dir": "out_continue",
   "model": {
-    "name": "alignn_atomwise_pure",
+    "name": "alignn_atomwise",
     "alignn_layers": 2,
     "gcn_layers": 2,
     "atom_input_features": 92,
