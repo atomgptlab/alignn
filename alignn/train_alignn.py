@@ -192,6 +192,15 @@ def train_for_folder(
         except Exception as exp:
             print("Check", exp)
 
+    if (
+        config.gpu_memory_fraction is not None
+        and torch.cuda.is_available()
+    ):
+        torch.cuda.set_per_process_memory_fraction(
+            float(config.gpu_memory_fraction),
+            rank if world_size > 1 else 0,
+        )
+
     # config.keep_data_order = keep_data_order
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)

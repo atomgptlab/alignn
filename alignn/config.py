@@ -180,6 +180,7 @@ class TrainingConfig(BaseSettings):
     target_multiplication_factor: Optional[float] = None
     epochs: int = 300
     batch_size: int = 64
+    gpu_memory_fraction: Optional[float] = None
     weight_decay: float = 0
     learning_rate: float = 1e-2
     filename: str = "sample"
