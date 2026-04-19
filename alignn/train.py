@@ -403,6 +403,16 @@ def train_dgl(
                 optimizer.step()
                 # optimizer.zero_grad() #never
                 running_loss += loss.item()
+            # Normalize running losses by number of batches so that printed
+            # values are per-batch mean losses (comparable across runs /
+            # dataset sizes), not raw sums.
+            _n_tr = max(1, len(train_loader))
+            running_loss /= _n_tr
+            running_loss1 /= _n_tr
+            running_loss2 /= _n_tr
+            running_loss3 /= _n_tr
+            running_loss4 /= _n_tr
+            running_loss5 /= _n_tr
             # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
             #    train_result
             # )
@@ -558,6 +568,14 @@ def train_dgl(
                 loss = loss1 + loss2 + loss3 + loss4 + loss5
                 val_result.append(info)
                 val_loss += loss.item()
+            # Normalize by number of val batches (see train-loop note).
+            _n_vl = max(1, len(val_loader))
+            val_loss /= _n_vl
+            val_loss1 /= _n_vl
+            val_loss2 /= _n_vl
+            val_loss3 /= _n_vl
+            val_loss4 /= _n_vl
+            val_loss5 /= _n_vl
             # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
             #    val_result
             # )
