@@ -84,6 +84,7 @@ nav:
       - Web Apps: usage/webapps.md
   - Reference:
       - Package Overview: api.md
+      - Config Reference: reference/config-reference.md
       - Performance: performance.md
       - Notes & FAQ: notes.md
       - References: references.md

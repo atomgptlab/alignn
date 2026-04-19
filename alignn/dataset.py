@@ -23,6 +23,7 @@ def load_graphs(
     cutoff: float = 8,
     cutoff_extra: float = 3,
     max_neighbors: int = 12,
+    three_body_cutoff: Optional[float] = None,
     cachedir: Optional[Path] = None,
     use_canonize: bool = False,
     id_tag="jid",
@@ -87,6 +88,7 @@ def load_graphs(
                 compute_line_graph=False,
                 use_canonize=use_canonize,
                 neighbor_strategy=neighbor_strategy,
+                three_body_cutoff=three_body_cutoff,
                 id=i[id_tag],
                 dtype=dtype,
             )
@@ -125,10 +127,12 @@ def get_torch_dataset(
     cutoff=8.0,
     cutoff_extra=3.0,
     max_neighbors=12,
+    three_body_cutoff=None,
     classification=False,
     output_dir=".",
     tmp_name="dataset",
     sampler=None,
+    read_existing=False,  # accepted for API parity; no-op (no cache here)
     dtype="float32",
 ):
     """Get Torch Dataset."""
@@ -152,6 +156,7 @@ def get_torch_dataset(
         cutoff=cutoff,
         cutoff_extra=cutoff_extra,
         max_neighbors=max_neighbors,
+        three_body_cutoff=three_body_cutoff,
         id_tag=id_tag,
         dtype=dtype,
     )

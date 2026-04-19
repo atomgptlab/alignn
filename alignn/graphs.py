@@ -264,6 +264,152 @@ def build_undirected_edgedata(
     return u, v, r, all_images
 
 
+def fast_graph(
+    atoms=None,
+    cutoff=5.0,
+    max_neighbors=None,
+    id=None,
+):
+    """Fast radius neighbor list using matscipy (C) on CPU.
+
+    Returns (u, v, r, images) in the same format as radius_graph so it
+    can be consumed by Graph.atom_dgl_multigraph downstream.
+    """
+    from matscipy.neighbours import neighbour_list as _matscipy_neighbours
+
+    ase_atoms = atoms.ase_converter()
+    i_np, j_np, D_np, S_np = _matscipy_neighbours(
+        "ijDS", ase_atoms, float(cutoff)
+    )
+
+    if max_neighbors is not None and max_neighbors > 0 and i_np.size > 0:
+        d_np = np.linalg.norm(D_np, axis=1)
+        # rank edges by distance globally, then keep first K per source
+        order = np.lexsort((d_np, i_np))
+        i_np = i_np[order]
+        j_np = j_np[order]
+        D_np = D_np[order]
+        S_np = S_np[order]
+        N = int(ase_atoms.positions.shape[0])
+        src_start = np.searchsorted(i_np, np.arange(N))
+        within = np.arange(i_np.shape[0]) - src_start[i_np]
+        sel = within < int(max_neighbors)
+        i_np = i_np[sel]
+        j_np = j_np[sel]
+        D_np = D_np[sel]
+        S_np = S_np[sel]
+
+    dtype = torch.get_default_dtype()
+    u = torch.from_numpy(np.ascontiguousarray(i_np)).long()
+    v = torch.from_numpy(np.ascontiguousarray(j_np)).long()
+    r = torch.from_numpy(np.ascontiguousarray(D_np)).type(dtype)
+    images = torch.from_numpy(np.ascontiguousarray(S_np)).type(dtype)
+    return u, v, r, images
+
+
+# =====================================================================
+# Fully-torch autograd-compatible neighbor list & graph builder
+#
+# Rationale:
+#   Existing radius_graph / fast_graph return `r` as a fresh tensor
+#   rebuilt from numpy, severing its link to atom positions and the
+#   lattice. For autograd-based forces (dE/dx) and stress (dE/dL), `r`
+#   must be a torch function of both. Here topology is computed once
+#   (discrete, no grad), and displacement vectors are then recomputed
+#   as `r = pos[dst] - pos[src] + shift @ lattice`, which carries
+#   gradients. The line graph uses `shared=True` so bond-angle cosines
+#   inherit the autograd graph automatically.
+# =====================================================================
+
+
+# Neighbor-list primitives now live in alignn.torch_graph_builder so
+# the pure-torch path doesn't transitively import DGL. Re-export them
+# here for backward compatibility.
+from alignn.torch_graph_builder import (  # noqa: E402,F401
+    _torch_periodic_shifts,
+    _topk_per_source,
+    torch_neighbor_list,
+)
+
+
+def torch_graph(
+    atoms=None,
+    cutoff=5.0,
+    max_neighbors=None,
+    atom_features="cgcnn",
+    compute_line_graph=True,
+    use_lattice_prop=False,
+    positions: Optional[torch.Tensor] = None,
+    lattice: Optional[torch.Tensor] = None,
+    device=None,
+    use_matscipy_topology: bool = True,
+    id=None,
+):
+    """End-to-end autograd-capable DGL (graph, line_graph) builder.
+
+    Returns ``(g, lg)`` if ``compute_line_graph`` else ``g``. When
+    ``positions`` / ``lattice`` are provided as torch leaves with
+    ``requires_grad=True``, ``g.edata['r']`` and ``lg.edata['h']``
+    carry gradients back to them.
+    """
+    dtype = torch.get_default_dtype()
+    if positions is None:
+        positions = torch.as_tensor(np.asarray(atoms.cart_coords), dtype=dtype)
+    if lattice is None:
+        lattice = torch.as_tensor(np.asarray(atoms.lattice_mat), dtype=dtype)
+    if device is not None:
+        positions = positions.to(device)
+        lattice = lattice.to(device)
+    device = positions.device
+    n_atoms = len(atoms.elements)
+
+    src, dst, shift, r = torch_neighbor_list(
+        positions=positions,
+        lattice=lattice,
+        cutoff=float(cutoff),
+        max_neighbors=max_neighbors,
+        atoms=atoms,
+        use_matscipy_topology=use_matscipy_topology,
+    )
+
+    sps_features = np.array(
+        [
+            list(get_node_attributes(s, atom_features=atom_features))
+            for s in atoms.elements
+        ]
+    )
+    node_features = torch.as_tensor(sps_features, dtype=dtype, device=device)
+
+    g = dgl.graph((src, dst), num_nodes=n_atoms)
+    if g.device != device:
+        g = g.to(device)
+    g.ndata["atom_features"] = node_features
+    g.edata["r"] = r  # differentiable w.r.t. positions & lattice
+    g.edata["images"] = shift  # integer cell offsets
+    vol = torch.abs(torch.det(lattice))
+    g.ndata["V"] = vol.expand(n_atoms)
+    frac = torch.as_tensor(
+        np.asarray(atoms.frac_coords), dtype=dtype, device=device
+    )
+    g.ndata["frac_coords"] = frac
+    if use_lattice_prop:
+        lp = np.array(
+            [atoms.lattice.lat_lengths(), atoms.lattice.lat_angles()]
+        ).flatten()
+        g.ndata["extra_features"] = (
+            torch.as_tensor(lp, dtype=dtype, device=device)
+            .unsqueeze(0)
+            .expand(n_atoms, -1)
+            .contiguous()
+        )
+
+    if compute_line_graph:
+        lg = g.line_graph(shared=True)
+        lg.apply_edges(compute_bond_cosines)
+        return g, lg
+    return g
+
+
 def radius_graph(
     atoms=None,
     cutoff=5,
@@ -483,6 +629,7 @@ class Graph(object):
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
         dtype="float32",
+        three_body_cutoff: Optional[float] = None,
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
@@ -503,6 +650,52 @@ class Graph(object):
             u, v, r, images = radius_graph(
                 atoms, cutoff=cutoff, cutoff_extra=cutoff_extra
             )
+        elif neighbor_strategy == "fast_graph":
+            u, v, r, images = fast_graph(
+                atoms,
+                cutoff=cutoff,
+                max_neighbors=max_neighbors,
+                id=id,
+            )
+        elif neighbor_strategy == "torch_graph":
+            # Returns a fully-built (g, lg) with autograd-capable r.
+            # Short-circuit to avoid the generic post-processing below
+            # which would detach r via torch.tensor(np.array(r)).
+            return torch_graph(
+                atoms=atoms,
+                cutoff=cutoff,
+                max_neighbors=max_neighbors,
+                atom_features=atom_features,
+                compute_line_graph=compute_line_graph,
+                use_lattice_prop=use_lattice_prop,
+                id=id,
+            )
+        elif neighbor_strategy == "pure_torch":
+            # Build with the pure-torch (non-DGL) builder, then
+            # materialize DGL graphs at the boundary. Downstream
+            # consumers (dataset/model) see DGL graphs as usual, and
+            # `edata["r"]` stays autograd-connected to positions and
+            # lattice because TorchGraph.to_dgl() assigns by reference.
+            from alignn.torch_graph_builder import (
+                build_pure_torch_graph as _build_pure_torch_graph,
+            )
+
+            _r3 = (
+                three_body_cutoff if three_body_cutoff is not None else cutoff
+            )
+            _out = _build_pure_torch_graph(
+                atoms=atoms,
+                two_body_cutoff=cutoff,
+                three_body_cutoff=_r3,
+                max_neighbors=max_neighbors,
+                atom_features=atom_features,
+                use_lattice_prop=use_lattice_prop,
+                compute_line_graph=compute_line_graph,
+            )
+            if compute_line_graph:
+                _tg, _tlg = _out
+                return _tg.to_dgl(), _tlg.to_dgl()
+            return _out.to_dgl()
         elif neighbor_strategy == "radius_graph_jarvis":
             g, lg = radius_graph_jarvis(
                 atoms,
@@ -844,6 +1037,18 @@ def prepare_line_graph_batch(
 #     return tuple(x.to(device) for x in batch)
 
 
+# Re-export the pure-torch (non-DGL) builder for convenience.
+# Defined in alignn.torch_graph_builder to keep that path importable
+# without pulling the full DGL-oriented graphs module.
+def build_pure_torch_graph(*args, **kwargs):
+    """See alignn.torch_graph_builder.build_pure_torch_graph."""
+    from alignn.torch_graph_builder import (
+        build_pure_torch_graph as _impl,
+    )
+
+    return _impl(*args, **kwargs)
+
+
 def compute_bond_cosines(edges):
     """Compute bond angle cosines from bond displacement vectors."""
     # line graph edge: (a, b), (b, c)
@@ -1062,7 +1267,7 @@ class StructureDataset(DGLDataset):
 
     @staticmethod
     def collate_line_graph(
-        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]],
     ):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, lattices, labels = map(list, zip(*samples))

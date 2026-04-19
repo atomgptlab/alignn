@@ -397,6 +397,7 @@ def train_for_folder(
         cutoff=config.cutoff,
         cutoff_extra=config.cutoff_extra,
         max_neighbors=config.max_neighbors,
+        three_body_cutoff=config.three_body_cutoff,
         output_features=config.model.output_features,
         classification_threshold=config.classification_threshold,
         target_multiplication_factor=config.target_multiplication_factor,
@@ -404,6 +405,8 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
         use_lmdb=config.use_lmdb,
+        use_pure_torch=config.model.name == "alignn_atomwise_pure",
+        read_existing=config.read_existing,
         dtype=config.dtype,
     )
     # print("dataset", dataset[0])

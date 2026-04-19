@@ -7,6 +7,7 @@ from typing import Literal
 from alignn.utils import BaseSettings
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
+from alignn.models.alignn_atomwise_pure import ALIGNNAtomWisePureConfig
 from alignn.models.ealignn_atomwise import eALIGNNAtomWiseConfig
 
 # import torch
@@ -155,7 +156,13 @@ class TrainingConfig(BaseSettings):
     target: TARGET_ENUM = "exfoliation_energy"
     atom_features: Literal["basic", "atomic_number", "cfid", "cgcnn"] = "cgcnn"
     neighbor_strategy: Literal[
-        "k-nearest", "voronoi", "radius_graph", "radius_graph_jarvis"
+        "k-nearest",
+        "voronoi",
+        "radius_graph",
+        "radius_graph_jarvis",
+        "fast_graph",
+        "torch_graph",
+        "pure_torch",
     ] = "k-nearest"
     id_tag: Literal["jid", "id", "_oqmd_entry_id"] = "jid"
 
@@ -193,6 +200,9 @@ class TrainingConfig(BaseSettings):
     num_workers: int = 4
     cutoff: float = 8.0
     cutoff_extra: float = 3.0
+    # Separate 3-body cutoff used by neighbor_strategy="pure_torch".
+    # When None, defaults to `cutoff`. Must be <= cutoff.
+    three_body_cutoff: Optional[float] = None
     max_neighbors: int = 12
     keep_data_order: bool = True
     normalize_graph_level_loss: bool = False
@@ -201,6 +211,10 @@ class TrainingConfig(BaseSettings):
     n_early_stopping: Optional[int] = None  # typically 50
     output_dir: str = os.path.abspath(".")
     use_lmdb: bool = True
+    # When True, reuse an existing LMDB cache on disk (fast, but the
+    # cache must match the current model backend + graph config).
+    # Default False: always rebuild from scratch for safety.
+    read_existing: bool = False
     # alignn_layers: int = 4
     # gcn_layers: int =4
     # edge_input_features: int= 80
@@ -212,5 +226,6 @@ class TrainingConfig(BaseSettings):
     model: Union[
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
+        ALIGNNAtomWisePureConfig,
         eALIGNNAtomWiseConfig,
     ] = ALIGNNAtomWiseConfig(name="alignn_atomwise")

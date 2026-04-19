@@ -145,6 +145,7 @@ def get_train_val_loaders(
     cutoff: float = 8.0,
     cutoff_extra: float = 3.0,
     max_neighbors: int = 12,
+    three_body_cutoff: Optional[float] = None,
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
     standard_scalar_and_pca=False,
@@ -154,10 +155,15 @@ def get_train_val_loaders(
     world_size=0,
     rank=0,
     use_lmdb: bool = True,
+    use_pure_torch: bool = False,
+    read_existing: bool = False,
     dtype="float32",
 ):
     """Help function to set up JARVIS train and val dataloaders."""
-    if use_lmdb:
+    if use_pure_torch:
+        print("Using pure-torch LMDB dataset (no DGL).")
+        from alignn.pure_lmdb_dataset import get_torch_dataset
+    elif use_lmdb:
         print("Using LMDB dataset.")
         from alignn.lmdb_dataset import get_torch_dataset
     else:
@@ -383,6 +389,8 @@ def get_train_val_loaders(
             cutoff=cutoff,
             cutoff_extra=cutoff_extra,
             max_neighbors=max_neighbors,
+            three_body_cutoff=three_body_cutoff,
+            read_existing=read_existing,
             classification=classification_threshold is not None,
             output_dir=output_dir,
             sampler=train_sampler,
@@ -409,6 +417,7 @@ def get_train_val_loaders(
                 cutoff_extra=cutoff_extra,
                 sampler=val_sampler,
                 max_neighbors=max_neighbors,
+                three_body_cutoff=three_body_cutoff,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,

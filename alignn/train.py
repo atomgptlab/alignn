@@ -12,6 +12,8 @@ from torch import nn
 from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
+from alignn.models.alignn_atomwise_pure import ALIGNNAtomWisePure
+from alignn.torch_graph_builder import unbatch as _graph_unbatch
 from alignn.models.ealignn_atomwise import eALIGNNAtomWise
 from alignn.models.alignn import ALIGNN
 from jarvis.db.jsonutils import dumpjson
@@ -29,7 +31,6 @@ from alignn.utils import (
     setup_optimizer,
     print_train_val_loss,
 )
-import dgl
 
 # from sklearn.metrics import log_loss
 
@@ -136,6 +137,8 @@ def train_dgl(
             filename=config.filename,
             cutoff=config.cutoff,
             max_neighbors=config.max_neighbors,
+            three_body_cutoff=config.three_body_cutoff,
+            read_existing=config.read_existing,
             output_features=config.model.output_features,
             classification_threshold=config.classification_threshold,
             target_multiplication_factor=config.target_multiplication_factor,
@@ -158,6 +161,7 @@ def train_dgl(
         config.model.classification = True
     _model = {
         "alignn_atomwise": ALIGNNAtomWise,
+        "alignn_atomwise_pure": ALIGNNAtomWisePure,
         "ealignn_atomwise": eALIGNNAtomWise,
         "alignn": ALIGNN,
     }
@@ -338,7 +342,7 @@ def train_dgl(
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
-                            for gg in dgl.unbatch(dats[0])
+                            for gg in _graph_unbatch(dats[0])
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
@@ -362,7 +366,7 @@ def train_dgl(
                     # print('unbatch',dgl.unbatch(dats[0]))
                     additional_dat = [
                         gg.ndata["additional"][0]
-                        for gg in dgl.unbatch(dats[0])
+                        for gg in _graph_unbatch(dats[0])
                     ]
                     # print('additional_dat',additional_dat,len(additional_dat))
                     targ = torch.stack(additional_dat).to(device)
@@ -497,7 +501,7 @@ def train_dgl(
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
-                            for gg in dgl.unbatch(dats[0])
+                            for gg in _graph_unbatch(dats[0])
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
@@ -521,7 +525,7 @@ def train_dgl(
                 if config.model.additional_output_weight != 0:
                     additional_dat = [
                         gg.ndata["additional"][0]
-                        for gg in dgl.unbatch(dats[0])
+                        for gg in _graph_unbatch(dats[0])
                     ]
                     # print('additional_dat',additional_dat,len(additional_dat))
                     targ = torch.stack(additional_dat).to(device)
@@ -679,7 +683,7 @@ def train_dgl(
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
-                            for gg in dgl.unbatch(dats[0])
+                            for gg in _graph_unbatch(dats[0])
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]

@@ -86,7 +86,7 @@ class TorchLMDBDataset(Dataset):
 
     @staticmethod
     def collate_line_graph(
-        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]],
     ):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, lattices, labels = map(list, zip(*samples))
@@ -124,12 +124,13 @@ def get_torch_dataset(
     cutoff=8.0,
     cutoff_extra=3.0,
     max_neighbors=12,
+    three_body_cutoff=None,
     classification=False,
     sampler=None,
     output_dir=".",
     tmp_name="dataset",
     map_size=1e12,
-    read_existing=True,
+    read_existing=False,
     dtype="float32",
 ):
     """Get Torch Dataset with LMDB."""
@@ -144,6 +145,24 @@ def get_torch_dataset(
     f.close()
     ids = []
     if os.path.exists(tmp_name) and read_existing:
+        # Validate the cache backend matches (DGL). A previous run with
+        # model.name="alignn_atomwise_pure" would have left TorchGraph
+        # pickles here, which dgl.batch can't consume.
+        _env = lmdb.open(tmp_name, readonly=True, lock=False)
+        with _env.begin() as _txn:
+            _probe = _txn.get(b"0")
+        _env.close()
+        if _probe is not None:
+            _sample = pk.loads(_probe)
+            _graph = _sample[0]
+            if not isinstance(_graph, dgl.DGLGraph):
+                raise RuntimeError(
+                    f"LMDB cache at '{tmp_name}' contains "
+                    f"{type(_graph).__name__} records, not DGLGraph. "
+                    "Delete the stale cache (e.g. `rm -rf "
+                    f"{tmp_name}`) and rerun — it was built for a "
+                    "different model backend."
+                )
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
         dat = TorchLMDBDataset(
@@ -152,6 +171,12 @@ def get_torch_dataset(
         print("Reading dataset", tmp_name)
         return dat
     ids = []
+    # Fresh build: wipe any pre-existing cache dir to avoid mixing old
+    # records (possibly from a different model backend) with new writes.
+    if os.path.exists(tmp_name):
+        import shutil
+
+        shutil.rmtree(tmp_name)
     env = lmdb.open(tmp_name, map_size=int(map_size))
     with env.begin(write=True) as txn:
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
@@ -167,6 +192,7 @@ def get_torch_dataset(
                 use_canonize=use_canonize,
                 cutoff_extra=cutoff_extra,
                 neighbor_strategy=neighbor_strategy,
+                three_body_cutoff=three_body_cutoff,
                 dtype=dtype,
             )
             if line_graph:
