@@ -15,7 +15,7 @@
   "test_ratio": 0.05,
   "target_multiplication_factor": null,
   "epochs": 50,
-  "batch_size": 5,
+  "batch_size": 2,
   "weight_decay": 1e-05,
   "learning_rate": 0.001,
   "filename": "sample",
