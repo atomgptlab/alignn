@@ -68,6 +68,7 @@ extra:
 nav:
   - Home: index.md
   - Installation: installation.md
+  - Colab Notebooks: examples-colab.md
   - Training:
       - Dataset Format: training/dataset-format.md
       - Single-Output Regression: training/single-output-regression.md

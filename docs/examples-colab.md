@@ -1,0 +1,18 @@
+# Google Colab Notebooks
+
+Ready-to-run Colab notebooks covering installation, property prediction, force-field
+training, and pretrained-model usage. Click the badge in any row to open the notebook in
+Colab.
+
+[colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
+
+| Notebook | Open in Colab | Description |
+| --- | --- | --- |
+| [Regression task (graph-wise prediction)](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb) | Single-output regression model for exfoliation energies of 2D materials. |
+| [ML force-field training from scratch](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb) | Train an ALIGNN-FF machine-learning force-field for Silicon. |
+| [ALIGNN-FF: relaxation, EV curve, phonons, interfaces](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb) | Using the pretrained ALIGNN-FF for structure relaxation, EV curves, phonons, interface gamma surfaces, and interface separation. |
+| [Scaling / timing comparison](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Timing_uMLFF.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Timing_uMLFF.ipynb) | Analyze scaling/timing of universal MLFFs. |
+| [Melt-Quench MD](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Fast_Melt_Quench.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Fast_Melt_Quench.ipynb) | Generate amorphous structures via molecular dynamics. |
+| [Miscellaneous training tasks](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb) | Single-output (formation energy, bandgap), multi-output (phonon/electron DOS), classification (metal vs non-metal), and pretrained-model usage. |
+| [Superconductor Tc](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Sc.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Sc.ipynb) | Train a model for superconductor transition temperature. |
+| [Build `id_prop.json` from VASP runs](https://colab.research.google.com/gist/knc6/5513b21f5fd83a7943509ffdf5c3608b/make_id_prop.ipynb) | [![Open In Colab][colab-badge]](https://colab.research.google.com/gist/knc6/5513b21f5fd83a7943509ffdf5c3608b/make_id_prop.ipynb) | Compile `vasprun.xml` files into an `id_prop.json` for ALIGNN-FF training. |
