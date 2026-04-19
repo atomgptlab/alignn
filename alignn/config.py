@@ -182,6 +182,12 @@ class TrainingConfig(BaseSettings):
     batch_size: int = 64
     gpu_memory_fraction: Optional[float] = None
     use_amp: bool = False  # bf16 mixed precision (A100/H100/RTX 30+)
+    # DDP tuning. find_unused_parameters=True is slow; enable only if
+    # your model has conditional branches whose gradients vary per step.
+    ddp_find_unused_parameters: bool = False
+    # When True, forces cuDNN determinism (slower). Decoupled from seed so
+    # you can seed for reproducibility without paying the speed cost.
+    deterministic: bool = False
     weight_decay: float = 0
     learning_rate: float = 1e-2
     filename: str = "sample"

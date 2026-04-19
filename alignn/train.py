@@ -1,6 +1,21 @@
 """Module for training script."""
 
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
+
+
+def _ddp_mean(value: float, use_ddp: bool) -> float:
+    """All-reduce a Python scalar across ranks and return the mean."""
+    if not use_ddp or not dist.is_available() or not dist.is_initialized():
+        return float(value)
+    t = torch.tensor(float(value), device=torch.cuda.current_device())
+    dist.all_reduce(t, op=dist.ReduceOp.SUM)
+    return (t / dist.get_world_size()).item()
+
+
+def _unwrap(net):
+    """Return underlying module from a DDP-wrapped model, else net itself."""
+    return net.module if isinstance(net, DDP) else net
 from functools import partial
 from typing import Any, Dict, Union
 import torch
@@ -78,10 +93,12 @@ def train_dgl(
     # checkpoint_dir = os.path.join(config.output_dir)
     # deterministic = False
     classification = False
+    is_main = rank == 0
     tmp = config.dict()
-    f = open(os.path.join(config.output_dir, "config.json"), "w")
-    f.write(json.dumps(tmp, indent=4))
-    f.close()
+    if is_main:
+        f = open(os.path.join(config.output_dir, "config.json"), "w")
+        f.write(json.dumps(tmp, indent=4))
+        f.close()
     global tmp_output_dir
     tmp_output_dir = config.output_dir
     pprint.pprint(tmp)  # , sort_dicts=False)
@@ -176,11 +193,14 @@ def train_dgl(
             xm.set_rng_state(config.random_seed)
         except ImportError:
             pass
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
         os.environ["PYTHONHASHSEED"] = str(config.random_seed)
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = str(":4096:8")
-        torch.use_deterministic_algorithms(True)
+        if getattr(config, "deterministic", False):
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = str(":4096:8")
+            torch.use_deterministic_algorithms(True)
+        else:
+            torch.backends.cudnn.benchmark = True
     if model is None:
         net = _model.get(config.model.name)(config.model)
     else:
@@ -208,7 +228,13 @@ def train_dgl(
     # print("device", device)
     net.to(device)
     if use_ddp:
-        net = DDP(net, device_ids=[rank], find_unused_parameters=True)
+        net = DDP(
+            net,
+            device_ids=[rank],
+            find_unused_parameters=bool(
+                getattr(config, "ddp_find_unused_parameters", False)
+            ),
+        )
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
@@ -413,6 +439,14 @@ def train_dgl(
             running_loss3 /= _n_tr
             running_loss4 /= _n_tr
             running_loss5 /= _n_tr
+            # Average across ranks so printed values reflect the whole
+            # global batch, not a single rank's shard.
+            running_loss = _ddp_mean(running_loss, use_ddp)
+            running_loss1 = _ddp_mean(running_loss1, use_ddp)
+            running_loss2 = _ddp_mean(running_loss2, use_ddp)
+            running_loss3 = _ddp_mean(running_loss3, use_ddp)
+            running_loss4 = _ddp_mean(running_loss4, use_ddp)
+            running_loss5 = _ddp_mean(running_loss5, use_ddp)
             # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
             #    train_result
             # )
@@ -431,10 +465,13 @@ def train_dgl(
                     running_loss5,
                 ]
             )
-            dumpjson(
-                filename=os.path.join(config.output_dir, "history_train.json"),
-                data=history_train,
-            )
+            if is_main:
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "history_train.json"
+                    ),
+                    data=history_train,
+                )
             val_loss = 0
             val_loss1 = 0
             val_loss2 = 0
@@ -576,38 +613,46 @@ def train_dgl(
             val_loss3 /= _n_vl
             val_loss4 /= _n_vl
             val_loss5 /= _n_vl
+            val_loss = _ddp_mean(val_loss, use_ddp)
+            val_loss1 = _ddp_mean(val_loss1, use_ddp)
+            val_loss2 = _ddp_mean(val_loss2, use_ddp)
+            val_loss3 = _ddp_mean(val_loss3, use_ddp)
+            val_loss4 = _ddp_mean(val_loss4, use_ddp)
+            val_loss5 = _ddp_mean(val_loss5, use_ddp)
             # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
             #    val_result
             # )
             val_fin_time = time.time()
             val_ep_time = val_fin_time - val_init_time
             current_model_name = "current_model.pt"
-            torch.save(
-                net.state_dict(),
-                os.path.join(config.output_dir, current_model_name),
-            )
+            if is_main:
+                torch.save(
+                    _unwrap(net).state_dict(),
+                    os.path.join(config.output_dir, current_model_name),
+                )
             saving_msg = ""
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model_name = "best_model.pt"
-                torch.save(
-                    net.state_dict(),
-                    os.path.join(config.output_dir, best_model_name),
-                )
-                # print("Saving data for epoch:", e)
-                saving_msg = "Saving model"
-                dumpjson(
-                    filename=os.path.join(
-                        config.output_dir, "Train_results.json"
-                    ),
-                    data=train_result,
-                )
-                dumpjson(
-                    filename=os.path.join(
-                        config.output_dir, "Val_results.json"
-                    ),
-                    data=val_result,
-                )
+                if is_main:
+                    torch.save(
+                        _unwrap(net).state_dict(),
+                        os.path.join(config.output_dir, best_model_name),
+                    )
+                    # print("Saving data for epoch:", e)
+                    saving_msg = "Saving model"
+                    dumpjson(
+                        filename=os.path.join(
+                            config.output_dir, "Train_results.json"
+                        ),
+                        data=train_result,
+                    )
+                    dumpjson(
+                        filename=os.path.join(
+                            config.output_dir, "Val_results.json"
+                        ),
+                        data=val_result,
+                    )
                 best_model = net
             history_val.append(
                 [
@@ -620,10 +665,13 @@ def train_dgl(
                 ]
             )
             # history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
-            dumpjson(
-                filename=os.path.join(config.output_dir, "history_val.json"),
-                data=history_val,
-            )
+            if is_main:
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "history_val.json"
+                    ),
+                    data=history_val,
+                )
             if rank == 0:
                 print_train_val_loss(
                     e,
@@ -736,16 +784,19 @@ def train_dgl(
                 loss = loss1 + loss2 + loss3 + loss4
                 if not classification:
                     test_loss += loss.item()
-            print("TestLoss", e, test_loss)
-            dumpjson(
-                filename=os.path.join(config.output_dir, "Test_results.json"),
-                data=test_result,
-            )
-            last_model_name = "last_model.pt"
-            torch.save(
-                net.state_dict(),
-                os.path.join(config.output_dir, last_model_name),
-            )
+            if is_main:
+                print("TestLoss", e, test_loss)
+                dumpjson(
+                    filename=os.path.join(
+                        config.output_dir, "Test_results.json"
+                    ),
+                    data=test_result,
+                )
+                last_model_name = "last_model.pt"
+                torch.save(
+                    _unwrap(net).state_dict(),
+                    os.path.join(config.output_dir, last_model_name),
+                )
             # return test_result
     if rank == 0 or world_size == 1:
         if config.write_predictions and classification:
