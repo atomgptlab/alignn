@@ -701,6 +701,10 @@ class Graph(object):
                 use_lattice_prop=use_lattice_prop,
                 compute_line_graph=compute_line_graph,
             )
+            # Return TorchGraph directly when DGL is unavailable; downstream
+            # pure-torch datasets / models accept TorchGraph natively.
+            if dgl is None:
+                return _out
             if compute_line_graph:
                 _tg, _tlg = _out
                 return _tg.to_dgl(), _tlg.to_dgl()
