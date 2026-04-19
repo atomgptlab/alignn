@@ -5,10 +5,15 @@ A prototype crystal line graph network dgl implementation.
 
 from typing import Tuple, Union
 from torch.autograd import grad
-import dgl
-import dgl.function as fn
+try:
+    import dgl
+    import dgl.function as fn
+    from dgl.nn import AvgPooling
+except ImportError:  # DGL optional; this module only usable if DGL installed
+    dgl = None
+    fn = None
+    AvgPooling = None
 import numpy as np
-from dgl.nn import AvgPooling
 import torch
 
 # from dgl.nn.functional import edge_softmax

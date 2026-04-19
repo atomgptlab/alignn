@@ -4,11 +4,16 @@ A prototype crystal line graph network dgl implementation.
 """
 
 from typing import Tuple, Union
-import dgl
-import dgl.function as fn
+try:
+    import dgl
+    import dgl.function as fn
+    from dgl.nn import AvgPooling
+except ImportError:
+    dgl = None
+    fn = None
+    AvgPooling = None
 import numpy as np
 import torch
-from dgl.nn import AvgPooling
 from typing import Literal
 from torch import nn
 from torch.nn import functional as F

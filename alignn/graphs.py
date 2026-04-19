@@ -11,9 +11,16 @@ from jarvis.core.specie import chem_data, get_node_attributes
 import math
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
-from dgl.data import DGLDataset
 import torch
-import dgl
+try:
+    from dgl.data import DGLDataset
+    import dgl
+except ImportError:  # DGL optional; DGL-dependent helpers will fail lazily
+    dgl = None
+
+    class DGLDataset:  # minimal stub so subclasses can still be defined
+        def __init__(self, *args, **kwargs):
+            pass
 from tqdm import tqdm
 from jarvis.core.atoms import Atoms
 

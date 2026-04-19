@@ -10,7 +10,14 @@ from jarvis.db.figshare import data as jdata
 from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
-from dgl.dataloading import GraphDataLoader
+try:
+    from dgl.dataloading import GraphDataLoader
+except ImportError:  # pure-torch path; fall back to stdlib DataLoader
+    from torch.utils.data import DataLoader as _TorchDataLoader
+
+    def GraphDataLoader(*args, use_ddp=False, **kwargs):
+        kwargs.pop("use_ddp", None)
+        return _TorchDataLoader(*args, **kwargs)
 import pickle as pk
 from sklearn.preprocessing import StandardScaler
 

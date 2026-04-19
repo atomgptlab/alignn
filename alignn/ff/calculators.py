@@ -14,6 +14,10 @@ from alignn.models.ealignn_atomwise import (
     eALIGNNAtomWiseConfig,
 )
 from alignn.models.alignn import ALIGNN, ALIGNNConfig
+from alignn.models.alignn_atomwise_pure import (
+    ALIGNNAtomWisePure,
+    ALIGNNAtomWisePureConfig,
+)
 import matplotlib.pyplot as plt  # noqa
 import zipfile
 import numpy as np
@@ -251,6 +255,10 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             if self.config["model"]["name"] == "alignn_atomwise":
                 model = ALIGNNAtomWise(
                     ALIGNNAtomWiseConfig(**self.config["model"])
+                )
+            elif self.config["model"]["name"] == "alignn_atomwise_pure":
+                model = ALIGNNAtomWisePure(
+                    ALIGNNAtomWisePureConfig(**self.config["model"])
                 )
             elif self.config["model"]["name"] == "alignn":
                 model = ALIGNN(ALIGNNConfig(**self.config["model"]))

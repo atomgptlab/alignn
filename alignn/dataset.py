@@ -4,7 +4,10 @@ from pathlib import Path
 from typing import Optional
 import os
 import torch
-import dgl
+try:
+    import dgl
+except ImportError:
+    dgl = None
 import numpy as np
 import pandas as pd
 from jarvis.core.atoms import Atoms

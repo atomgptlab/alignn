@@ -11,7 +11,10 @@ from torch.utils.data import Dataset
 import torch
 from tqdm import tqdm
 from typing import List, Tuple
-import dgl
+try:
+    import dgl
+except ImportError:
+    dgl = None
 
 
 def prepare_line_graph_batch(
