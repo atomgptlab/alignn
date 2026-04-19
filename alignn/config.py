@@ -181,6 +181,7 @@ class TrainingConfig(BaseSettings):
     epochs: int = 300
     batch_size: int = 64
     gpu_memory_fraction: Optional[float] = None
+    use_amp: bool = False  # bf16 mixed precision (A100/H100/RTX 30+)
     weight_decay: float = 0
     learning_rate: float = 1e-2
     filename: str = "sample"
@@ -204,7 +205,7 @@ class TrainingConfig(BaseSettings):
     # Separate 3-body cutoff used by neighbor_strategy="pure_torch".
     # When None, defaults to `cutoff`. Must be <= cutoff.
     three_body_cutoff: Optional[float] = 3.5
-    max_neighbors: int = 12
+    max_neighbors: Optional[int] = 12
     keep_data_order: bool = True
     normalize_graph_level_loss: bool = False
     distributed: bool = False

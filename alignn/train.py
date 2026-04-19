@@ -263,18 +263,29 @@ def train_dgl(
                 info = {}
                 # info["id"] = jid
                 optimizer.zero_grad()
-                if (config.compute_line_graph) > 0:
-                    # if (config.model.alignn_layers) > 0:
-                    result = net(
-                        [
-                            dats[0].to(device),
-                            dats[1].to(device),
-                            dats[2].to(device),
-                        ]
+                _amp_ctx = torch.autocast(
+                    device_type="cuda",
+                    dtype=torch.bfloat16,
+                    enabled=bool(
+                        getattr(config, "use_amp", False)
                     )
+                    and torch.cuda.is_available(),
+                )
+                with _amp_ctx:
+                    if (config.compute_line_graph) > 0:
+                        # if (config.model.alignn_layers) > 0:
+                        result = net(
+                            [
+                                dats[0].to(device),
+                                dats[1].to(device),
+                                dats[2].to(device),
+                            ]
+                        )
 
-                else:
-                    result = net([dats[0].to(device), dats[1].to(device)])
+                    else:
+                        result = net(
+                            [dats[0].to(device), dats[1].to(device)]
+                        )
                 # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
