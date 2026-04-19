@@ -627,7 +627,7 @@ class Graph(object):
     def atom_dgl_multigraph(
         atoms=None,
         neighbor_strategy="k-nearest",
-        cutoff=8.0,
+        cutoff=4.0,
         max_neighbors=12,
         atom_features="cgcnn",
         max_attempts=3,
@@ -638,7 +638,7 @@ class Graph(object):
         use_lattice_prop: bool = False,
         cutoff_extra=3.5,
         dtype="float32",
-        three_body_cutoff: Optional[float] = None,
+        three_body_cutoff: Optional[float] = 3.5,
     ):
         """Obtain a DGLGraph for Atoms object."""
         # print('id',id)
