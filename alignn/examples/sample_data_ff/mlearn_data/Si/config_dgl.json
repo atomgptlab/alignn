@@ -63,5 +63,5 @@
     "classification": false,
     "use_cutoff_function": true
   },
-  "three_body_cutoff": 4.0
+  "three_body_cutoff": 3.5
 }

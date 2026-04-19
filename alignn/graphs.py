@@ -627,7 +627,7 @@ class Graph(object):
     def atom_dgl_multigraph(
         atoms=None,
         neighbor_strategy="k-nearest",
-        cutoff=4.0,
+        cutoff=5.0,
         max_neighbors=12,
         atom_features="cgcnn",
         max_attempts=3,

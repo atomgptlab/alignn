@@ -65,5 +65,5 @@
     "classification": false,
     "stress_multiplier": 1
   },
-  "three_body_cutoff": 4.0
+  "three_body_cutoff": 3.5
 }

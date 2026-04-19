@@ -206,7 +206,7 @@ class TrainingConfig(BaseSettings):
     use_canonize: bool = True
     compute_line_graph: bool = True
     num_workers: int = 4
-    cutoff: float = 4.0
+    cutoff: float = 5.0
     cutoff_extra: float = 3.0
     # Separate 3-body cutoff used by neighbor_strategy="pure_torch".
     # When None, defaults to `cutoff`. Must be <= cutoff.

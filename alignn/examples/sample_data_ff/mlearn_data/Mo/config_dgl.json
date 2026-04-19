@@ -62,5 +62,5 @@
     "force_mult_natoms": true,
     "classification": false
   },
-  "three_body_cutoff": 4.0
+  "three_body_cutoff": 3.5
 }
