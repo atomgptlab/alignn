@@ -1,5 +1,7 @@
 """Module to generate networkx graphs."""
 
+from __future__ import annotations
+
 from jarvis.core.atoms import get_supercell_dims
 from jarvis.core.specie import Specie
 from jarvis.core.utils import random_colors

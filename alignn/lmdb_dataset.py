@@ -1,5 +1,7 @@
 """Module to prepare LMDB ALIGNN dataset."""
 
+from __future__ import annotations
+
 import os
 import numpy as np
 import lmdb
@@ -158,7 +160,7 @@ def get_torch_dataset(
         if _probe is not None:
             _sample = pk.loads(_probe)
             _graph = _sample[0]
-            if not isinstance(_graph, dgl.DGLGraph):
+            if dgl is None or not isinstance(_graph, dgl.DGLGraph):
                 raise RuntimeError(
                     f"LMDB cache at '{tmp_name}' contains "
                     f"{type(_graph).__name__} records, not DGLGraph. "

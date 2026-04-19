@@ -3,6 +3,8 @@
 A prototype crystal line graph network dgl implementation.
 """
 
+from __future__ import annotations
+
 from typing import Tuple, Union
 from torch.autograd import grad
 try:
