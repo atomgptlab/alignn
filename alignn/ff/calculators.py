@@ -252,21 +252,26 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         if self.model is None:
 
-            if self.config["model"]["name"] == "alignn_atomwise":
+            model = None
+            mname = self.config["model"]["name"]
+            if mname == "alignn_atomwise":
                 model = ALIGNNAtomWise(
                     ALIGNNAtomWiseConfig(**self.config["model"])
                 )
-            elif self.config["model"]["name"] == "alignn_atomwise_pure":
+            elif mname == "alignn_atomwise_pure":
                 model = ALIGNNAtomWisePure(
                     ALIGNNAtomWisePureConfig(**self.config["model"])
                 )
-            elif self.config["model"]["name"] == "alignn":
+            elif mname == "alignn":
                 model = ALIGNN(ALIGNNConfig(**self.config["model"]))
-            elif self.config["model"]["name"] == "ealignn_atomwise":
+            elif mname == "ealignn_atomwise":
                 model = eALIGNNAtomWise(
                     eALIGNNAtomWiseConfig(**self.config["model"])
                 )
-            model.state_dict()
+            if model is None:
+                raise ValueError(
+                    f"Unsupported model name '{mname}' in config"
+                )
             if "atomwise" in self.config["model"]["name"]:
                 model.load_state_dict(
                     torch.load(
