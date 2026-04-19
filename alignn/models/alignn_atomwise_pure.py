@@ -113,6 +113,12 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     penalty_threshold: float = 1.0
     additional_output_features: int = 0
     additional_output_weight: float = 0.0
+    # Attention variants (Shao et al., Adv. Theory Simul. 2026):
+    #   "alignn"   - original edge-gated conv
+    #   "n_alignn" - Node-Attention Layer (NAL), per-node learnable weights
+    #   "t_alignn" - Self-Attention Layer (SAL), Transformer-style Q/K/V
+    conv_type: Literal["alignn", "n_alignn", "t_alignn"] = "alignn"
+    num_heads: int = 1
 
     class Config:
         env_prefix = "jv_model"
@@ -178,13 +184,202 @@ class EdgeGatedGraphConvPure(nn.Module):
         return self.forward_tensors(g.src, g.dst, g.num_nodes, x, y)
 
 
+def _scatter_softmax(
+    logits: torch.Tensor, dst: torch.Tensor, num_nodes: int
+) -> torch.Tensor:
+    """Per-destination softmax over edges (pure torch, scatter-based)."""
+    max_per_dst = torch.full(
+        (num_nodes,) + logits.shape[1:],
+        float("-inf"),
+        dtype=logits.dtype,
+        device=logits.device,
+    )
+    idx = dst
+    while idx.dim() < logits.dim():
+        idx = idx.unsqueeze(-1)
+    idx_e = idx.expand_as(logits)
+    max_per_dst.scatter_reduce_(
+        0, idx_e, logits, reduce="amax", include_self=True
+    )
+    shifted = logits - max_per_dst[dst]
+    exp_l = torch.exp(shifted)
+    sum_exp = scatter_sum(exp_l, dst, num_nodes)
+    return exp_l / (sum_exp[dst] + 1e-8)
+
+
+class NodeAttentionGraphConvPure(nn.Module):
+    """Node-Attention Layer (NAL) — pure torch.
+
+    Paper Eq. (8):
+        m_ij = A_src_i * L_src h_i + sum_j (A_dst_j * L_dst h_j + L_e e_ij)
+    with A_src, A_dst as per-node learned sigmoids over node features.
+    """
+
+    def __init__(
+        self,
+        input_features: int,
+        output_features: int,
+        residual: bool = True,
+        num_heads: int = 1,
+    ):
+        super().__init__()
+        self.residual = residual
+        self.num_heads = num_heads
+        self.output_features = output_features
+        assert output_features % num_heads == 0
+        self.head_dim = output_features // num_heads
+
+        self.src_gate = nn.Linear(input_features, output_features)
+        self.dst_gate = nn.Linear(input_features, output_features)
+        self.edge_gate = nn.Linear(input_features, output_features)
+        self.bn_edges = nn.LayerNorm(output_features)
+        self.src_update = nn.Linear(input_features, output_features)
+        self.dst_update = nn.Linear(input_features, output_features)
+        self.bn_nodes = nn.LayerNorm(output_features)
+
+        # Per-node attention heads: sigmoid(fc(h)) -> [N, num_heads]
+        self.attn_src = nn.Linear(input_features, num_heads)
+        self.attn_dst = nn.Linear(input_features, num_heads)
+
+    def _apply_attn(
+        self, proj: torch.Tensor, a: torch.Tensor
+    ) -> torch.Tensor:
+        # proj: [N, F]; a: [N, heads]
+        N = proj.shape[0]
+        ph = proj.view(N, self.num_heads, self.head_dim)
+        return (a.unsqueeze(-1) * ph).view(N, self.output_features)
+
+    @torch.jit.ignore
+    def forward(
+        self, g: TorchGraph, x: torch.Tensor, y: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        src, dst, N = g.src, g.dst, g.num_nodes
+
+        a_src = torch.sigmoid(self.attn_src(x))
+        a_dst = torch.sigmoid(self.attn_dst(x))
+        e_src = self._apply_attn(self.src_gate(x), a_src)
+        e_dst = self._apply_attn(self.dst_gate(x), a_dst)
+
+        m = e_src[src] + e_dst[dst] + self.edge_gate(y)
+        sigma = torch.sigmoid(m)
+
+        Bh = self.dst_update(x)
+        sum_sigma_h = scatter_sum(Bh[src] * sigma, dst, N)
+        sum_sigma = scatter_sum(sigma, dst, N)
+        h = sum_sigma_h / (sum_sigma + 1e-6)
+        x_new = self.src_update(x) + h
+
+        x_new = F.silu(self.bn_nodes(x_new))
+        y_new = F.silu(self.bn_edges(m))
+        if self.residual:
+            x_new = x + x_new
+            y_new = y + y_new
+        return x_new, y_new
+
+
+class SelfAttentionGraphConvPure(nn.Module):
+    """Self-Attention Layer (SAL) — pure torch.
+
+    Paper Eqs. (9)-(11):
+        score  = softmax((q_i . k_j . k_e) / sqrt(d))
+        h_i'   = fc(h_i) + SiLU(Norm(sum_j score . v_j))
+        e_ij'  = fc(e_ij) + SiLU(Norm(score))
+    """
+
+    def __init__(
+        self,
+        input_features: int,
+        output_features: int,
+        residual: bool = True,
+        num_heads: int = 1,
+    ):
+        super().__init__()
+        self.residual = residual
+        self.num_heads = num_heads
+        self.output_features = output_features
+        assert output_features % num_heads == 0
+        self.head_dim = output_features // num_heads
+        self.scale = self.head_dim**0.5
+
+        self.W_q = nn.Linear(input_features, output_features)
+        self.W_k = nn.Linear(input_features, output_features)
+        self.W_v = nn.Linear(input_features, output_features)
+        self.W_ke = nn.Linear(input_features, output_features)
+
+        self.fc_node = nn.Linear(input_features, output_features)
+        self.fc_edge = nn.Linear(input_features, output_features)
+        self.bn_nodes = nn.LayerNorm(output_features)
+        self.bn_edges = nn.LayerNorm(output_features)
+
+    @torch.jit.ignore
+    def forward(
+        self, g: TorchGraph, x: torch.Tensor, y: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        src, dst, N = g.src, g.dst, g.num_nodes
+        E = y.shape[0]
+        H, D = self.num_heads, self.head_dim
+
+        q = self.W_q(x).view(N, H, D)
+        k = self.W_k(x).view(N, H, D)
+        v = self.W_v(x).view(N, H, D)
+        k_e = self.W_ke(y).view(E, H, D)
+
+        # Attention logits per edge, per head: [E, H, 1]
+        attn_logits = (q[dst] * k[src] * k_e).sum(dim=-1, keepdim=True) / (
+            self.scale
+        )
+        # Softmax over incoming edges per destination, per head.
+        attn = _scatter_softmax(
+            attn_logits.squeeze(-1), dst, N
+        ).unsqueeze(-1)  # [E, H, 1]
+
+        # Weighted value aggregation per destination node.
+        weighted = (attn * v[src]).view(E, self.output_features)
+        h_agg = scatter_sum(weighted, dst, N)
+        x_new = self.fc_node(x) + F.silu(self.bn_nodes(h_agg))
+
+        # Edge update uses the attention scores themselves (paper Eq. 11).
+        score_e = attn.expand(E, H, D).reshape(E, self.output_features)
+        y_new = self.fc_edge(y) + F.silu(self.bn_edges(score_e))
+        return x_new, y_new
+
+
+def _make_bond_conv(
+    in_features: int,
+    out_features: int,
+    conv_type: str,
+    num_heads: int,
+) -> nn.Module:
+    if conv_type == "alignn":
+        return EdgeGatedGraphConvPure(in_features, out_features)
+    if conv_type == "n_alignn":
+        return NodeAttentionGraphConvPure(
+            in_features, out_features, num_heads=num_heads
+        )
+    if conv_type == "t_alignn":
+        return SelfAttentionGraphConvPure(
+            in_features, out_features, num_heads=num_heads
+        )
+    raise ValueError(f"Unknown conv_type: {conv_type!r}")
+
+
 class ALIGNNConvPure(nn.Module):
     """Line-graph-aware ALIGNN update."""
 
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        conv_type: str = "alignn",
+        num_heads: int = 1,
+    ):
         super().__init__()
-        self.node_update = EdgeGatedGraphConvPure(in_features, out_features)
-        self.edge_update = EdgeGatedGraphConvPure(out_features, out_features)
+        self.node_update = _make_bond_conv(
+            in_features, out_features, conv_type, num_heads
+        )
+        self.edge_update = _make_bond_conv(
+            out_features, out_features, conv_type, num_heads
+        )
 
     def forward_tensors(
         self,
@@ -215,6 +410,12 @@ class ALIGNNConvPure(nn.Module):
         y: torch.Tensor,
         z: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # Attention convs (NAL/SAL) don't have forward_tensors — dispatch
+        # through the graph-object forward, which handles all conv types.
+        if not isinstance(self.node_update, EdgeGatedGraphConvPure):
+            x, m = self.node_update(g, x, y)
+            y, z = self.edge_update(lg, m, z)
+            return x, y, z
         return self.forward_tensors(
             g.src,
             g.dst,
@@ -299,14 +500,22 @@ class ALIGNNAtomWisePure(nn.Module):
         )
         self.alignn_layers = nn.ModuleList(
             [
-                ALIGNNConvPure(config.hidden_features, config.hidden_features)
+                ALIGNNConvPure(
+                    config.hidden_features,
+                    config.hidden_features,
+                    conv_type=config.conv_type,
+                    num_heads=config.num_heads,
+                )
                 for _ in range(config.alignn_layers)
             ]
         )
         self.gcn_layers = nn.ModuleList(
             [
-                EdgeGatedGraphConvPure(
-                    config.hidden_features, config.hidden_features
+                _make_bond_conv(
+                    config.hidden_features,
+                    config.hidden_features,
+                    config.conv_type,
+                    config.num_heads,
                 )
                 for _ in range(config.gcn_layers)
             ]
