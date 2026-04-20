@@ -32,7 +32,6 @@ from typing import Dict, List, Optional
 import numpy as np
 import torch
 
-
 # ---------------------------------------------------------------------
 # Neighbor-list primitives (moved here from alignn.graphs so importing
 # this module stays DGL-free).
@@ -76,6 +75,107 @@ def _topk_per_source(
 
 
 def torch_neighbor_list(
+    positions: torch.Tensor,
+    lattice: torch.Tensor,
+    cutoff: float,
+    max_neighbors: Optional[int] = None,
+    atoms=None,
+    use_matscipy_topology: bool = False,
+    self_tol: float = 1e-8,
+    chunk_size: int = 512,
+):
+    """Torch-native periodic neighbor list with differentiable edges.
+
+    Memory-chunked over source atoms: peak memory is O(K * chunk * N)
+    instead of O(K * N^2), which also sidesteps torch's INT_MAX limit
+    on torch.where for very large boolean tensors.
+    """
+    dtype = positions.dtype
+    device = positions.device
+    num_nodes = int(positions.shape[0])
+
+    used_matscipy = False
+    if use_matscipy_topology and atoms is not None:
+        try:
+            from matscipy.neighbours import neighbour_list as _mnl
+
+            i_np, j_np, S_np = _mnl(
+                "ijS", atoms.ase_converter(), float(cutoff)
+            )
+            src = torch.from_numpy(np.ascontiguousarray(i_np)).to(
+                device=device, dtype=torch.long
+            )
+            dst = torch.from_numpy(np.ascontiguousarray(j_np)).to(
+                device=device, dtype=torch.long
+            )
+            shift = torch.from_numpy(np.ascontiguousarray(S_np)).to(
+                device=device, dtype=dtype
+            )
+            used_matscipy = True
+        except ImportError:
+            pass
+
+    if not used_matscipy:
+        shifts = _torch_periodic_shifts(lattice, cutoff)  # (K, 3)
+        with torch.no_grad():
+            offs = shifts @ lattice  # (K, 3) cartesian
+            c2 = float(cutoff) * float(cutoff)
+
+            # Dynamically shrink chunk for very large systems so that
+            # (K * chunk * N) bool tensor stays well under INT_MAX.
+            K = int(shifts.shape[0])
+            max_elems = 2**30  # ~1.07e9, safe
+            max_chunk_by_int = max(1, max_elems // max(K * num_nodes, 1))
+            eff_chunk = max(1, min(chunk_size, max_chunk_by_int))
+
+            src_chunks, dst_chunks, shift_chunks = [], [], []
+            for i0 in range(0, num_nodes, eff_chunk):
+                i1 = min(i0 + eff_chunk, num_nodes)
+                # (K, chunk, N, 3)
+                rvec = (
+                    positions[None, None, :, :]
+                    + offs[:, None, None, :]
+                    - positions[None, i0:i1, None, :]
+                )
+                dist2 = rvec.pow(2).sum(-1)  # (K, chunk, N)
+                mask = (dist2 <= c2) & (dist2 > self_tol)
+                del rvec, dist2
+                k_idx, i_local, j_idx = torch.where(mask)
+                del mask
+                src_chunks.append((i_local + i0).to(torch.long))
+                dst_chunks.append(j_idx.to(torch.long))
+                shift_chunks.append(shifts[k_idx])
+                del k_idx, i_local, j_idx
+
+            src = (
+                torch.cat(src_chunks)
+                if src_chunks
+                else torch.empty(0, dtype=torch.long, device=device)
+            )
+            dst = (
+                torch.cat(dst_chunks)
+                if dst_chunks
+                else torch.empty(0, dtype=torch.long, device=device)
+            )
+            shift = (
+                torch.cat(shift_chunks)
+                if shift_chunks
+                else torch.empty((0, 3), dtype=dtype, device=device)
+            )
+
+    # Differentiable displacement vectors — this is the autograd bridge
+    r = positions[dst] - positions[src] + shift @ lattice
+
+    if max_neighbors is not None and max_neighbors > 0 and src.numel() > 0:
+        with torch.no_grad():
+            dist = r.norm(dim=1)
+        keep = _topk_per_source(src, dist, int(max_neighbors), num_nodes)
+        src, dst, shift, r = src[keep], dst[keep], shift[keep], r[keep]
+
+    return src, dst, shift, r
+
+
+def torch_neighbor_list_old(
     positions: torch.Tensor,
     lattice: torch.Tensor,
     cutoff: float,
