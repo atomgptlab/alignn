@@ -82,6 +82,7 @@ nav:
       - ALIGNN-FF: pretrained/alignn-ff.md
   - Usage:
       - ASE Calculator: usage/ase-calculator.md
+      - MD & Relaxation (pure PyTorch): usage/md-integrators.md
       - Web Apps: usage/webapps.md
   - Reference:
       - Package Overview: api.md
