@@ -27,7 +27,6 @@ from alignn.models.utils import MLPLayer, RBFExpansion
 from alignn.torch_graph_builder import TorchGraph, torchgraph_from_dgl
 from alignn.utils import BaseSettings
 
-
 # =====================================================================
 # Primitives
 # =====================================================================
@@ -109,8 +108,10 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     use_penalty: bool = True
     extra_features: int = 0
     exponent: int = 5
-    penalty_factor: float = 0.1
+    penalty_factor: float = 0.5
     penalty_threshold: float = 1.0
+    # penalty_factor: float = 0.1
+    # penalty_threshold: float = 1.0
     additional_output_features: int = 0
     additional_output_weight: float = 0.0
     # Attention variants (Shao et al., Adv. Theory Simul. 2026):
@@ -241,9 +242,7 @@ class NodeAttentionGraphConvPure(nn.Module):
         self.attn_src = nn.Linear(input_features, num_heads)
         self.attn_dst = nn.Linear(input_features, num_heads)
 
-    def _apply_attn(
-        self, proj: torch.Tensor, a: torch.Tensor
-    ) -> torch.Tensor:
+    def _apply_attn(self, proj: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
         # proj: [N, F]; a: [N, heads]
         N = proj.shape[0]
         ph = proj.view(N, self.num_heads, self.head_dim)
@@ -329,9 +328,9 @@ class SelfAttentionGraphConvPure(nn.Module):
             self.scale
         )
         # Softmax over incoming edges per destination, per head.
-        attn = _scatter_softmax(
-            attn_logits.squeeze(-1), dst, N
-        ).unsqueeze(-1)  # [E, H, 1]
+        attn = _scatter_softmax(attn_logits.squeeze(-1), dst, N).unsqueeze(
+            -1
+        )  # [E, H, 1]
 
         # Weighted value aggregation per destination node.
         weighted = (attn * v[src]).view(E, self.output_features)
