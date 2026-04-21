@@ -43,6 +43,7 @@ setuptools.setup(
         "alignn/pretrained.py",
         "alignn/train_alignn.py",
         "alignn/run_alignn_ff.py",
+        "alignn/scripts/torch/export_torchscript.py",
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",

@@ -1,8 +1,15 @@
+#!/usr/bin/env python
 """Export a trained ALIGNN-FF model as a TorchScript `.pt` file for the
 native LAMMPS pair style (pair_alignn).
 
+Installed as the `export_torchscript.py` console script after
+`pip install -e .` (see setup.py).
+
 Usage:
-    python scripts/torch/export_torchscript.py \\
+    export_torchscript.py --model-dir OutputDir --out alignn_ff.pt
+
+Or during development:
+    python alignn/scripts/torch/export_torchscript.py \\
         --model-dir OutputDir --out alignn_ff.pt
 
 The saved module exposes:

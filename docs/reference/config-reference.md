@@ -211,7 +211,7 @@ When the pure model is selected, the training pipeline automatically:
 - Leaves dataloader / loss / metrics / checkpoints untouched.
 
 For LAMMPS integration, call
-[`alignn/scripts/export_torchscript.py`](https://github.com/atomgptlab/alignn/blob/main/alignn/scripts/export_torchscript.py) — it scripts the
+[`alignn/scripts/torch/export_torchscript.py`](https://github.com/atomgptlab/alignn/blob/main/alignn/scripts/torch/export_torchscript.py) (installed as the `export_torchscript.py` console script) — it scripts the
 `forward_tensors_z(positions, lattice, atomic_numbers, src, dst, shift,
 compute_stress)` entry point and bakes the atomic-number → feature lookup into
 the `.pt` so the C++ host only needs atomic numbers.

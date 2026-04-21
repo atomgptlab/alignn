@@ -72,13 +72,19 @@ version.
 
 ## Exporting the TorchScript model
 
+After installing the repo with `pip install -e .` (or `pip install alignn`),
+the `export_torchscript.py` console script is on your `PATH`:
+
 ```bash
-python alignn/scripts/torch/export_torchscript.py \
+export_torchscript.py \
     --model-dir MELT/OutputDir \
     --out alignn_ff.pt \
     --atom-features atomic_number \
     --dtype float32
 ```
+
+(Equivalent to `python alignn/scripts/torch/export_torchscript.py ...` if
+you prefer running the source file directly during development.)
 
 Output:
 ```
