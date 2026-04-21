@@ -40,8 +40,11 @@ cd alignn
 pip install -e .                # installs train_alignn.py, export_torchscript.py, ...
 ```
 
-Make sure you do this inside an activated conda env (`$CONDA_PREFIX` must
-be set). The build script will error out early otherwise.
+Works in both environments:
+- **Conda env**: the build uses `mamba` to install CUDA + MKL when missing.
+- **System Python (e.g. Google Colab)**: the build falls back to `pip install` for
+  `nvidia-cuda-*-cu12 mkl mkl-devel mkl-include`, and detects CUDA at
+  `/usr/local/cuda` automatically.
 
 ### Step 2 — run the build script
 
