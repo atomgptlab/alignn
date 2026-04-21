@@ -7,10 +7,19 @@ the quenched structure.
 
 Prereqs:
 
-- `alignn` installed (`pip install -e .` from a clone)
-- `lammps` Python package compiled with `pair_alignn` (see
-  [LAMMPS Pair Style](lammps-pair-style.md) for the build)
-- Plotly (`pip install plotly`)
+- Clone + install alignn:
+  ```bash
+  git clone https://github.com/atomgptlab/alignn.git
+  cd alignn && pip install -e .
+  ```
+- LAMMPS built with `pair_alignn` compiled in. It's a single command:
+  ```bash
+  bash alignn/scripts/torch/build_lammps_alignn.sh
+  ```
+  The script auto-installs CUDA + MKL into your conda env if they're
+  missing. Full reference:
+  [Building LAMMPS with `pair_alignn`](lammps-pair-style.md#building-lammps-with-pair_alignn-from-a-fresh-clone).
+- Plotly for the RDF plot: `pip install plotly`.
 
 Working directory for this tutorial: `MELT/` (create anywhere).
 

@@ -26,49 +26,115 @@ loop.
 3. `pair_alignn.cpp` / `pair_alignn.h` compiled into that LAMMPS binary
 4. A TorchScript `.pt` of your model exported via `export_torchscript.py`
 
-## Building LAMMPS with `pair_alignn`
+## Building LAMMPS with `pair_alignn` — from a fresh clone
 
-The repo ships a self-contained build script
-(`alignn/scripts/torch/build_lammps_alignn.sh`) that:
+The repo ships `alignn/scripts/torch/build_lammps_alignn.sh`, a
+self-contained script that handles the full build, including prerequisite
+installs.
 
-1. Clones LAMMPS `stable_29Aug2024_update1`
-2. Drops `pair_alignn.cpp/.h` into `src/`
-3. Appends a libtorch `find_package` to `cmake/CMakeLists.txt`
-4. Configures + builds + installs the Python module
-
-Prerequisites in your conda env (one-time):
+### Step 1 — clone and install alignn
 
 ```bash
-# Matching CUDA toolkit for libtorch (check your PyTorch first)
-python -c "import torch; print(torch.version.cuda)"
-# If 12.8, install:
-mamba install -y -c nvidia -c conda-forge cuda-toolkit=12.8 mkl-devel mkl-include
+git clone https://github.com/atomgptlab/alignn.git
+cd alignn
+pip install -e .                # installs train_alignn.py, export_torchscript.py, ...
 ```
 
-Then run the build script:
+Make sure you do this inside an activated conda env (`$CONDA_PREFIX` must
+be set). The build script will error out early otherwise.
+
+### Step 2 — run the build script
 
 ```bash
 bash alignn/scripts/torch/build_lammps_alignn.sh
 ```
 
-On success, you'll see:
+That's it. The script:
+
+1. Discovers the active env's PyTorch + CUDA + libtorch ABI flag
+2. **Auto-installs matching `cuda-toolkit` and `mkl-devel`** via
+   `mamba install -c nvidia -c conda-forge` if they're missing or the
+   version doesn't match libtorch (set `SKIP_CUDA_MKL=1` to disable)
+3. Clones LAMMPS `stable_29Aug2024_update1` to `$LAMMPS_DIR`
+   (default `~/lammps-alignn`)
+4. Drops `pair_alignn.cpp/.h` into LAMMPS's `src/` (picked up by the
+   default source glob — no package-system gymnastics)
+5. Appends a `find_package(Torch)` + `target_link_libraries(... TORCH_LIBRARIES)`
+   block to `cmake/CMakeLists.txt` (idempotent via marker comment)
+6. Configures with Ninja, compiles with all available cores
+7. Runs `make install-python` to wire the libtorch-linked build into your
+   conda env's `lammps` Python module
+8. **Overwrites `$CONDA_PREFIX/lib/liblammps.so.0`** with the new build
+   (the standalone `lmp` binary's RPATH picks the conda lib first, so
+   without this step the binary keeps using a stale .so)
+9. Prints ✓/✗ verification for both the Python module and the standalone
+   binary
+
+Takes ~5–15 minutes depending on machine. Successful output ends with:
 ```
-pair_alignn available: True
+✓ Python module has pair_alignn
+✓ Standalone binary has pair_alignn:  ~/lammps-alignn/build/lmp
 ```
 
-The built `lmp` executable lands at `~/lammps-alignn/build/lmp`, and the
-conda `lammps` Python module is overwritten with the libtorch-linked
-version.
+**Env-var knobs:**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LAMMPS_DIR` | `$HOME/lammps-alignn` | where to clone + build LAMMPS |
+| `LAMMPS_TAG` | `stable_29Aug2024_update1` | LAMMPS release to clone |
+| `SKIP_CUDA_MKL` | unset | set to `1` to skip auto-install of CUDA/MKL |
+| `JOBS` | `$(nproc)` | parallel compile jobs |
+
+Example overrides:
+```bash
+LAMMPS_DIR=/opt/lammps-alignn JOBS=16 \
+    bash alignn/scripts/torch/build_lammps_alignn.sh
+```
+
+### Step 3 — verify (script does this automatically; manual fallback)
+
+```bash
+# Standalone binary
+$LAMMPS_DIR/build/lmp -help | grep alignn
+# → alignn  (as a registered pair style)
+
+# Python module (what most scripts / validators use)
+python -c "from lammps import lammps; l=lammps(); print('alignn' in l.available_styles('pair'))"
+# → True
+```
+
+### Rebuild after editing `pair_alignn.cpp`
+
+If you modify the C++ source in the alignn repo, just re-run the build
+script — the clone step is skipped automatically if `$LAMMPS_DIR` already
+exists, and everything else runs from a clean `build/`:
+
+```bash
+bash alignn/scripts/torch/build_lammps_alignn.sh
+```
+
+Or do it manually, skipping the full reconfigure:
+
+```bash
+cp alignn/scripts/torch/pair_alignn/pair_alignn.{cpp,h} $LAMMPS_DIR/src/
+cd $LAMMPS_DIR/build
+cmake --build . -j$(nproc)
+cmake --build . --target install-python
+cp liblammps.so.0 $CONDA_PREFIX/lib/liblammps.so.0    # keep standalone binary in sync
+```
 
 ### Common build issues
 
-| Symptom | Cause | Fix |
+These are all handled automatically by the build script, but listed here
+for context if something goes wrong:
+
+| Symptom | Cause | What the script does (and manual fix if needed) |
 |---|---|---|
-| `PyTorch: CUDA cannot be found` | CUDA toolkit version mismatches libtorch's build version | install matching `cuda-toolkit=X.Y` via conda |
-| `Imported target "torch" includes non-existent path ".../MKL_INCLUDE_DIR-NOTFOUND"` | MKL not installed | `mamba install mkl-devel mkl-include` |
-| `fatal error: cuda.h: No such file or directory` | CUDA headers not on include path | cmake flag: `-DCMAKE_CXX_FLAGS="-I$CONDA_PREFIX/targets/x86_64-linux/include"` |
-| `Enabled packages: <None>` | cmake didn't wire pair_alignn in | verify `append find_package(Torch)` block lives at the end of `cmake/CMakeLists.txt` |
-| Builds but `pair_alignn` not listed | `pair_alignn.cpp` not in `src/` | `cp pair_alignn.{cpp,h} ~/lammps-alignn/src/` |
+| `PyTorch: CUDA cannot be found` | CUDA toolkit version mismatches libtorch | auto-installs matching `cuda-toolkit=<torch_cuda>` via mamba |
+| `Imported target "torch" includes non-existent path ".../MKL_INCLUDE_DIR-NOTFOUND"` | MKL not installed | auto-installs `mkl-devel mkl-include` |
+| `fatal error: cuda.h: No such file or directory` | CUDA headers not on include path | adds `-I$CONDA_PREFIX/targets/x86_64-linux/include` to CXX flags |
+| Python module works but `lmp` binary fails with "Unrecognized pair style" | RPATH resolves conda's stale `liblammps.so.0` first | `cp liblammps.so.0 $CONDA_PREFIX/lib/` — done in step 8 |
+| `Could NOT find CUDA` on a CPU-only machine | libtorch was built with CUDA | install a CPU-only libtorch separately, or use a matching CPU-only PyTorch in the env |
 
 ## Exporting the TorchScript model
 
