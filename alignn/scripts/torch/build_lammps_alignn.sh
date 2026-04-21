@@ -8,7 +8,7 @@ set -euo pipefail
 LAMMPS_TAG="stable_29Aug2024_update1"
 LAMMPS_DIR="$HOME/lammps-alignn"
 ALIGNN_REPO="/home/kamalch/Software/ollama311/alignn"
-PAIR_SRC="$ALIGNN_REPO/scripts/torch/pair_alignn"
+PAIR_SRC="$ALIGNN_REPO/alignn/scripts/torch/pair_alignn"
 
 # ── discover conda env's libtorch ─────────────────────────────────────────
 TORCH_DIR=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
