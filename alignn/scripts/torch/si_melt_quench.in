@@ -1,0 +1,49 @@
+# LAMMPS melt-quench for Si with ALIGNN-FF via torch bridge.
+# Invoke: python scripts/torch/lammps_bridge_torch.py \
+#             --model-dir OutputDir --input scripts/torch/si_melt_quench.in --types Si
+
+units           metal
+atom_style      atomic
+boundary        p p p
+
+read_data       si.data
+mass            1 28.0855
+
+# ALIGNN-FF hook — callback provides forces + virial every step
+pair_style      zero 8.0
+pair_coeff      * *
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+fix             alignn all external pf/callback 1 1
+
+timestep        0.001            # 1 fs (metal units: ps)
+thermo          50
+thermo_style    custom step temp pe ke etotal press vol
+dump            traj all custom 100 si_melt_quench.lammpstrj id type x y z
+
+# ── Stage 1 — equilibrate 300 K ──
+velocity        all create 300.0 12345 mom yes rot yes
+fix             nvt1 all nvt temp 300.0 300.0 0.1
+run             200
+unfix           nvt1
+
+# ── Stage 2 — heat to 3500 K over 1 ps ──
+fix             nvt2 all nvt temp 300.0 3500.0 0.1
+run             1000
+unfix           nvt2
+
+# ── Stage 3 — hold molten ──
+fix             nvt3 all nvt temp 3500.0 3500.0 0.1
+run             2000
+unfix           nvt3
+
+# ── Stage 4 — quench to 300 K over 4 ps ──
+fix             nvt4 all nvt temp 3500.0 300.0 0.1
+run             4000
+unfix           nvt4
+
+# ── Stage 5 — anneal 300 K ──
+fix             nvt5 all nvt temp 300.0 300.0 0.1
+run             2000
+
+write_data      si_quenched.data

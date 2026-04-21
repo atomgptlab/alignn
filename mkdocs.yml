@@ -83,6 +83,7 @@ nav:
   - Usage:
       - ASE Calculator: usage/ase-calculator.md
       - MD & Relaxation (pure PyTorch): usage/md-integrators.md
+      - LAMMPS Pair Style (native C++): usage/lammps-pair-style.md
       - Web Apps: usage/webapps.md
   - Reference:
       - Package Overview: api.md
