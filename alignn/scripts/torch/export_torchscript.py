@@ -32,10 +32,19 @@ def main():
     ap.add_argument("--out", default="alignn_ff.pt")
     ap.add_argument("--atom-features", default="atomic_number",
                     help="must match what was used at training time")
-    ap.add_argument("--dtype", default="float32", choices=["float32", "float64"])
+    ap.add_argument("--dtype", default="float32",
+                    choices=["float32", "float64", "float16", "bfloat16"],
+                    help="float32 is the safe default; bfloat16 halves memory "
+                         "with minimal accuracy loss; float16 is risky for "
+                         "MD forces (may NaN on small gradient magnitudes).")
     args = ap.parse_args()
 
-    dtype = torch.float32 if args.dtype == "float32" else torch.float64
+    dtype_map = {"float32": torch.float32, "float64": torch.float64,
+                 "float16": torch.float16, "bfloat16": torch.bfloat16}
+    dtype = dtype_map[args.dtype]
+    if args.dtype == "float16":
+        print("[warn] fp16 forces can NaN during long MD runs. "
+              "Consider --dtype bfloat16 instead.")
 
     cfg_raw = json.load(open(f"{args.model_dir}/config.json"))
     mcfg = dict(cfg_raw["model"])
