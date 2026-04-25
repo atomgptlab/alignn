@@ -269,9 +269,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                     eALIGNNAtomWiseConfig(**self.config["model"])
                 )
             if model is None:
-                raise ValueError(
-                    f"Unsupported model name '{mname}' in config"
-                )
+                raise ValueError(f"Unsupported model name '{mname}' in config")
             if "atomwise" in self.config["model"]["name"]:
                 model.load_state_dict(
                     torch.load(
@@ -375,7 +373,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         #    / 160.21766208
         # )
         if "atomwise" in self.config["model"]["name"]:
-            energy = result["out"].detach().cpu().numpy()
+            # energy = result["out"].squeeze().detach().cpu().numpy()
+            energy = result["out"].detach().cpu().item()
         else:
             energy = result.detach().cpu().numpy()
         if self.intensive:
@@ -391,6 +390,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             "forces": forces,
             "stress": stress,
         }
+        # print("self.results",self.results)
 
 
 class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
