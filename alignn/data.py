@@ -10,6 +10,7 @@ from jarvis.db.figshare import data as jdata
 from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
+
 try:
     from dgl.dataloading import GraphDataLoader
 except ImportError:  # pure-torch path; fall back to stdlib DataLoader
@@ -18,6 +19,8 @@ except ImportError:  # pure-torch path; fall back to stdlib DataLoader
     def GraphDataLoader(*args, use_ddp=False, **kwargs):
         kwargs.pop("use_ddp", None)
         return _TorchDataLoader(*args, **kwargs)
+
+
 import pickle as pk
 from sklearn.preprocessing import StandardScaler
 
@@ -478,7 +481,20 @@ def get_train_val_loaders(
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,
+            persistent_workers=(workers > 0),
+            prefetch_factor=2 if workers > 0 else None,
         )
+        # train_loader = GraphDataLoader(
+        #    # train_loader = DataLoader(
+        #    train_data,
+        #    batch_size=batch_size,
+        #    shuffle=True,
+        #    collate_fn=collate_fn,
+        #    drop_last=True,
+        #    num_workers=workers,
+        #    pin_memory=pin_memory,
+        #    use_ddp=use_ddp,
+        # )
 
         val_loader = GraphDataLoader(
             # val_loader = DataLoader(
@@ -490,7 +506,20 @@ def get_train_val_loaders(
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,
+            persistent_workers=(workers > 0),
+            prefetch_factor=2 if workers > 0 else None,
         )
+        # val_loader = GraphDataLoader(
+        #    # val_loader = DataLoader(
+        #    val_data,
+        #    batch_size=batch_size,
+        #    shuffle=False,
+        #    collate_fn=collate_fn,
+        #    drop_last=True,
+        #    num_workers=workers,
+        #    pin_memory=pin_memory,
+        #    use_ddp=use_ddp,
+        # )
 
         test_loader = (
             GraphDataLoader(
@@ -504,9 +533,26 @@ def get_train_val_loaders(
                 pin_memory=pin_memory,
                 use_ddp=use_ddp,
             )
-            if len(dataset_test) > 0
+            if test_data is not None
             else None
         )
+
+        # All loaders constructed; safe to free the in-memory dataset
+        # lists. With 1.5M-entry datasets these can hold tens of GB of
+        # full atomic-structure dicts, and they are no longer needed
+        # once the LMDB caches are built and the loaders reference
+        # them via the Dataset wrappers.
+        del dataset_train
+        del dataset_val
+        del dataset_test
+        del dat
+        try:
+            del d
+        except NameError:
+            pass
+        import gc
+
+        gc.collect()
 
         if save_dataloader:
             torch.save(train_loader, train_sample)
