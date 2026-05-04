@@ -7,14 +7,16 @@ from __future__ import annotations
 
 from typing import Tuple, Union
 from torch.autograd import grad
+
 try:
     import dgl
     import dgl.function as fn
     from dgl.nn import AvgPooling
-except ImportError:  # DGL optional; this module only usable if DGL installed
+except:  # DGL optional; this module only usable if DGL installed
     dgl = None
     fn = None
     AvgPooling = None
+    print("WARNING: No DGL, might fail")
 import numpy as np
 import torch
 

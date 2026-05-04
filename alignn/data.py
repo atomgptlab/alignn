@@ -13,7 +13,7 @@ from jarvis.db.jsonutils import dumpjson
 
 try:
     from dgl.dataloading import GraphDataLoader
-except ImportError:  # pure-torch path; fall back to stdlib DataLoader
+except:  # pure-torch path; fall back to stdlib DataLoader
     from torch.utils.data import DataLoader as _TorchDataLoader
 
     def GraphDataLoader(*args, use_ddp=False, **kwargs):

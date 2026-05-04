@@ -6,11 +6,12 @@ A prototype crystal line graph network dgl implementation.
 from __future__ import annotations
 
 from typing import Tuple, Union
+
 try:
     import dgl
     import dgl.function as fn
     from dgl.nn import AvgPooling
-except ImportError:
+except:
     dgl = None
     fn = None
     AvgPooling = None

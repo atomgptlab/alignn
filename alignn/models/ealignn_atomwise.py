@@ -7,11 +7,12 @@ from __future__ import annotations
 
 from typing import Tuple, Union
 from torch.autograd import grad
+
 try:
     import dgl
     import dgl.function as fn
     from dgl.nn import AvgPooling
-except ImportError:
+except:
     dgl = None
     fn = None
     AvgPooling = None
