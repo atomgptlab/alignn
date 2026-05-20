@@ -41,15 +41,10 @@ import warnings
 import time
 from sklearn.metrics import roc_auc_score
 from alignn.utils import (
-    # activated_output_transform,
-    # make_standard_scalar_and_pca,
-    # thresholded_output_transform,
     group_decay,
     setup_optimizer,
     print_train_val_loss,
 )
-
-# from sklearn.metrics import log_loss
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -67,21 +62,16 @@ figlet_alignn = """
 def train_dgl(
     config: Union[TrainingConfig, Dict[str, Any]],
     model: nn.Module = None,
-    # checkpoint_dir: Path = Path("./"),
     train_val_test_loaders=[],
     rank=0,
     world_size=0,
-    # log_tensorboard: bool = False,
 ):
     """Training entry point for DGL networks.
 
     `config` should conform to alignn.conf.TrainingConfig, and
     if passed as a dict with matching keys, pydantic validation is used
     """
-    # print("rank", rank)
-    # setup(rank, world_size)
     if rank == 0:
-        # print(config)
         if type(config) is dict:
             try:
                 print("Trying to convert dictionary.")
@@ -92,8 +82,6 @@ def train_dgl(
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
-    # checkpoint_dir = os.path.join(config.output_dir)
-    # deterministic = False
     classification = False
     is_main = rank == 0
     tmp = config.dict()
@@ -103,7 +91,7 @@ def train_dgl(
         f.close()
     global tmp_output_dir
     tmp_output_dir = config.output_dir
-    pprint.pprint(tmp)  # , sort_dicts=False)
+    pprint.pprint(tmp)
     if config.classification_threshold is not None:
         classification = True
     TORCH_DTYPES = {
@@ -115,7 +103,6 @@ def train_dgl(
     torch.set_default_dtype(TORCH_DTYPES[config.dtype])
     line_graph = False
     if config.compute_line_graph > 0:
-        # if config.model.alignn_layers > 0:
         line_graph = True
     if world_size > 1:
         use_ddp = True
@@ -125,10 +112,6 @@ def train_dgl(
         if torch.cuda.is_available():
             device = torch.device("cuda")
     if not train_val_test_loaders:
-        # use input standardization for all real-valued feature sets
-        # print("config.neighbor_strategy",config.neighbor_strategy)
-        # import sys
-        # sys.exit()
         (
             train_loader,
             val_loader,
@@ -172,7 +155,6 @@ def train_dgl(
         val_loader = train_val_test_loaders[1]
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
-    # rank=0
     if use_ddp:
         device = torch.device(f"cuda:{rank}")
     prepare_batch = partial(prepare_batch, device=device)
@@ -227,7 +209,6 @@ def train_dgl(
         print(statistics)
     except Exception:
         pass
-    # print("device", device)
     net.to(device)
     if use_ddp:
         net = DDP(
@@ -237,48 +218,50 @@ def train_dgl(
                 getattr(config, "ddp_find_unused_parameters", False)
             ),
         )
-    # group parameters to skip weight decay for bias and batchnorm
+    # ------------------------------------------------------------------
+    # Build optimizer ONCE and bind the scheduler to it.
+    # (Previously this block created the optimizer twice — once here and
+    #  once again inside the `if "alignn_" in config.model.name:` block —
+    #  which left the scheduler bound to a stale optimizer that never
+    #  stepped, triggering the
+    #  "lr_scheduler.step() before optimizer.step()" warning and producing
+    #  a broken LR schedule.)
+    # ------------------------------------------------------------------
     params = group_decay(net)
     optimizer = setup_optimizer(params, config)
+
     if config.scheduler == "none":
         # always return multiplier of 1 (i.e. do nothing)
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer, lambda epoch: 1.0
         )
-
     elif config.scheduler == "onecycle":
         steps_per_epoch = len(train_loader)
-        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
             epochs=config.epochs,
             steps_per_epoch=steps_per_epoch,
-            # pct_start=pct_start,
             pct_start=0.3,
         )
     elif config.scheduler == "step":
-        # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
         scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer,
         )
 
-    # if (
-    #    config.model.name == "alignn_atomwise"
-    #    or config.model.name == "alignn_ff2"
-    # ):
+    # OneCycleLR expects scheduler.step() per batch; other schedulers we
+    # step per epoch.
+    _step_scheduler_per_batch = config.scheduler == "onecycle"
+
     if "alignn_" in config.model.name:
         best_loss = np.inf
         criterion = nn.L1Loss()
         if classification:
             criterion = nn.NLLLoss()
-        params = group_decay(net)
-        optimizer = setup_optimizer(params, config)
-        # optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+        # NOTE: optimizer / scheduler intentionally NOT recreated here.
         history_train = []
         history_val = []
         for e in range(config.epochs):
-            # optimizer.zero_grad()
             train_init_time = time.time()
             running_loss = 0
             running_loss1 = 0
@@ -289,7 +272,6 @@ def train_dgl(
             train_result = []
             for dats, jid in zip(train_loader, train_loader.dataset.ids):
                 info = {}
-                # info["id"] = jid
                 optimizer.zero_grad()
                 _amp_ctx = torch.autocast(
                     device_type="cuda",
@@ -299,7 +281,6 @@ def train_dgl(
                 )
                 with _amp_ctx:
                     if (config.compute_line_graph) > 0:
-                        # if (config.model.alignn_layers) > 0:
                         result = net(
                             [
                                 dats[0].to(device),
@@ -307,10 +288,8 @@ def train_dgl(
                                 dats[2].to(device),
                             ]
                         )
-
                     else:
                         result = net([dats[0].to(device), dats[1].to(device)])
-                # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
                 info["target_atomwise_pred"] = []
@@ -328,23 +307,17 @@ def train_dgl(
                 loss4 = 0  # Such as stresses
                 loss5 = 0  # Such as dos
                 if config.model.output_features is not None:
-                    # print('criterion',criterion)
-                    # print('result["out"]',result["out"])
-                    # print('dats[-1]',dats[-1])
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"],
                         dats[-1].to(device),
-                        # result["out"], dats[2].to(device)
                     )
                     info["target_out"] = dats[-1].cpu().numpy().tolist()
-                    # info["target_out"] = dats[2].cpu().numpy().tolist()
                     info["pred_out"] = (
                         result["out"].cpu().detach().numpy().tolist()
                     )
                     running_loss1 += loss1.item()
                 if (
                     config.model.atomwise_output_features > 0
-                    # config.model.atomwise_output_features is not None
                     and config.model.atomwise_weight != 0
                 ):
                     loss2 = config.model.atomwise_weight * criterion(
@@ -372,8 +345,6 @@ def train_dgl(
                     )
                     running_loss3 += loss3.item()
                 if config.model.stresswise_weight != 0:
-                    # print('unbatch',dgl.unbatch(dats[0]))
-
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
@@ -381,55 +352,40 @@ def train_dgl(
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
-                    # print('targ_stress',targ_stress,targ_stress.shape)
-                    # print('pred_stress',pred_stress,pred_stress.shape)
                     loss4 = config.model.stresswise_weight * criterion(
                         pred_stress.to(device),
                         targ_stress.to(device),
                     )
-                    info["target_stress"] = (
-                        targ_stress.cpu()
-                        .numpy()
-                        .tolist()
-                        # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
-                    )
+                    info["target_stress"] = targ_stress.cpu().numpy().tolist()
                     info["pred_stress"] = (
                         result["stresses"].cpu().detach().numpy().tolist()
                     )
                     running_loss4 += loss4.item()
                 if config.model.additional_output_weight != 0:
-                    # print('unbatch',dgl.unbatch(dats[0]))
                     additional_dat = [
                         gg.ndata["additional"][0]
                         for gg in _graph_unbatch(dats[0])
                     ]
-                    # print('additional_dat',additional_dat,len(additional_dat))
                     targ = torch.stack(additional_dat).to(device)
-                    # targ=torch.tensor(additional_dat).to( dats[0].device)
-                    # print('result["additional"]',result["additional"],result["additional"].shape)
-                    # print('targ',targ,targ.shape)
-                    # print('targ device',targ.device)
                     loss5 = config.model.additional_output_weight * criterion(
                         (result["additional"]).to(device),
                         targ,
-                        # (dats[0].ndata["additional"]).to(device),
                     )
                     info["target_additional"] = targ.cpu().numpy().tolist()
                     info["pred_additional"] = (
                         result["additional"].cpu().detach().numpy().tolist()
                     )
                     running_loss5 += loss5.item()
-                    # print("target_stress", info["target_stress"][0])
-                    # print("pred_stress", info["pred_stress"][0])
                 train_result.append(info)
                 loss = loss1 + loss2 + loss3 + loss4 + loss5
                 loss.backward()
                 optimizer.step()
-                # optimizer.zero_grad() #never
+                # Step OneCycleLR per batch (its design assumption); other
+                # schedulers are stepped once per epoch below.
+                if _step_scheduler_per_batch:
+                    scheduler.step()
                 running_loss += loss.item()
-            # Normalize running losses by number of batches so that printed
-            # values are per-batch mean losses (comparable across runs /
-            # dataset sizes), not raw sums.
+            # Normalize running losses by number of batches
             _n_tr = max(1, len(train_loader))
             running_loss /= _n_tr
             running_loss1 /= _n_tr
@@ -437,22 +393,17 @@ def train_dgl(
             running_loss3 /= _n_tr
             running_loss4 /= _n_tr
             running_loss5 /= _n_tr
-            # Average across ranks so printed values reflect the whole
-            # global batch, not a single rank's shard.
             running_loss = _ddp_mean(running_loss, use_ddp)
             running_loss1 = _ddp_mean(running_loss1, use_ddp)
             running_loss2 = _ddp_mean(running_loss2, use_ddp)
             running_loss3 = _ddp_mean(running_loss3, use_ddp)
             running_loss4 = _ddp_mean(running_loss4, use_ddp)
             running_loss5 = _ddp_mean(running_loss5, use_ddp)
-            # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
-            #    train_result
-            # )
-            # dumpjson(filename="Train_results.json", data=train_result)
-            scheduler.step()
+            # Epoch-level scheduler step for non-OneCycle schedulers.
+            if not _step_scheduler_per_batch:
+                scheduler.step()
             train_final_time = time.time()
             train_ep_time = train_final_time - train_init_time
-            # if rank == 0: # or world_size == 1:
             history_train.append(
                 [
                     running_loss,
@@ -477,15 +428,11 @@ def train_dgl(
             val_loss4 = 0
             val_loss5 = 0
             val_result = []
-            # for dats in val_loader:
             val_init_time = time.time()
             for dats, jid in zip(val_loader, val_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
                 optimizer.zero_grad()
-                # result = net([dats[0].to(device), dats[1].to(device)])
-                # if (config.model.alignn_layers) > 0:
-                # if (config.create_line_graph) > 0:
                 if (config.compute_line_graph) > 0:
                     result = net(
                         [
@@ -496,8 +443,6 @@ def train_dgl(
                     )
                 else:
                     result = net([dats[0].to(device), dats[1].to(device)])
-                    # result = net(dats[0].to(device))
-                # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
                 info["target_atomwise_pred"] = []
@@ -506,11 +451,11 @@ def train_dgl(
                 info["pred_grad"] = []
                 info["target_stress"] = []
                 info["pred_stress"] = []
-                loss1 = 0  # Such as energy
-                loss2 = 0  # Such as bader charges
-                loss3 = 0  # Such as forces
-                loss4 = 0  # Such as stresses
-                loss5 = 0  # Such as stresses
+                loss1 = 0
+                loss2 = 0
+                loss3 = 0
+                loss4 = 0
+                loss5 = 0
                 if config.model.output_features is not None:
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"], dats[-1].to(device)
@@ -549,11 +494,6 @@ def train_dgl(
                     )
                     val_loss3 += loss3.item()
                 if config.model.stresswise_weight != 0:
-                    # loss4 = config.model.stresswise_weight * criterion(
-                    #    result["stress"].to(device),
-                    #    dats[0].ndata["stresses"][0].to(device),
-                    # )
-
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
@@ -561,18 +501,11 @@ def train_dgl(
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
-                    # print('targ_stress',targ_stress,targ_stress.shape)
-                    # print('pred_stress',pred_stress,pred_stress.shape)
                     loss4 = config.model.stresswise_weight * criterion(
                         pred_stress.to(device),
                         targ_stress.to(device),
                     )
-                    info["target_stress"] = (
-                        targ_stress.cpu()
-                        .numpy()
-                        .tolist()
-                        # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
-                    )
+                    info["target_stress"] = targ_stress.cpu().numpy().tolist()
                     info["pred_stress"] = (
                         result["stresses"].cpu().detach().numpy().tolist()
                     )
@@ -583,16 +516,10 @@ def train_dgl(
                         gg.ndata["additional"][0]
                         for gg in _graph_unbatch(dats[0])
                     ]
-                    # print('additional_dat',additional_dat,len(additional_dat))
                     targ = torch.stack(additional_dat).to(device)
-                    # targ=torch.tensor(additional_dat).to( dats[0].device)
-                    # print('result["additional"]',result["additional"],result["additional"].shape)
-                    # print('targ',targ,targ.shape)
-                    # print('targ device',targ.device)
                     loss5 = config.model.additional_output_weight * criterion(
                         (result["additional"]).to(device),
                         targ,
-                        # (dats[0].ndata["additional"]).to(device),
                     )
                     info["target_additional"] = targ.cpu().numpy().tolist()
                     info["pred_additional"] = (
@@ -603,7 +530,6 @@ def train_dgl(
                 loss = loss1 + loss2 + loss3 + loss4 + loss5
                 val_result.append(info)
                 val_loss += loss.item()
-            # Normalize by number of val batches (see train-loop note).
             _n_vl = max(1, len(val_loader))
             val_loss /= _n_vl
             val_loss1 /= _n_vl
@@ -617,9 +543,6 @@ def train_dgl(
             val_loss3 = _ddp_mean(val_loss3, use_ddp)
             val_loss4 = _ddp_mean(val_loss4, use_ddp)
             val_loss5 = _ddp_mean(val_loss5, use_ddp)
-            # mean_out, mean_atom, mean_grad, mean_stress = get_batch_errors(
-            #    val_result
-            # )
             val_fin_time = time.time()
             val_ep_time = val_fin_time - val_init_time
             current_model_name = "current_model.pt"
@@ -637,7 +560,6 @@ def train_dgl(
                         _unwrap(net).state_dict(),
                         os.path.join(config.output_dir, best_model_name),
                     )
-                    # print("Saving data for epoch:", e)
                     saving_msg = "Saving model"
                     dumpjson(
                         filename=os.path.join(
@@ -662,7 +584,6 @@ def train_dgl(
                     val_loss5,
                 ]
             )
-            # history_val.append([mean_out, mean_atom, mean_grad, mean_stress])
             if is_main:
                 dumpjson(
                     filename=os.path.join(
@@ -694,14 +615,10 @@ def train_dgl(
             test_loss = 0
             test_result = []
             for dats, jid in zip(test_loader, test_loader.dataset.ids):
-                # for dats in test_loader:
                 info = {}
                 info["id"] = jid
                 optimizer.zero_grad()
-                # if (config.model.alignn_layers) > 0:
-                # if (config.create_line_graph) > 0:
                 if (config.compute_line_graph) > 0:
-                    # result = net([dats[0].to(device), dats[1].to(device)])
                     result = net(
                         [
                             dats[0].to(device),
@@ -711,17 +628,14 @@ def train_dgl(
                     )
                 else:
                     result = net([dats[0].to(device), dats[1].to(device)])
-                    # result = net(dats[0].to(device))
-                loss1 = 0  # Such as energy
-                loss2 = 0  # Such as bader charges
-                loss3 = 0  # Such as forces
-                loss4 = 0  # Such as stresses
+                loss1 = 0
+                loss2 = 0
+                loss3 = 0
+                loss4 = 0
                 if (
                     config.model.output_features is not None
                     and not classification
                 ):
-                    # print('result["out"]',result["out"])
-                    # print('dats[2]',dats[2])
                     loss1 = config.model.graphwise_weight * criterion(
                         result["out"], dats[-1].to(device)
                     )
@@ -762,18 +676,11 @@ def train_dgl(
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
-                    # print('targ_stress',targ_stress,targ_stress.shape)
-                    # print('pred_stress',pred_stress,pred_stress.shape)
                     loss4 = config.model.stresswise_weight * criterion(
                         pred_stress.to(device),
                         targ_stress.to(device),
                     )
-                    info["target_stress"] = (
-                        targ_stress.cpu()
-                        .numpy()
-                        .tolist()
-                        # dats[0].ndata["stresses"][0].cpu().numpy().tolist()
-                    )
+                    info["target_stress"] = targ_stress.cpu().numpy().tolist()
                     info["pred_stress"] = (
                         result["stresses"].cpu().detach().numpy().tolist()
                     )
@@ -795,11 +702,9 @@ def train_dgl(
                     _unwrap(net).state_dict(),
                     os.path.join(config.output_dir, last_model_name),
                 )
-            # return test_result
     if rank == 0 or world_size == 1:
         if config.write_predictions and classification:
             best_model.eval()
-            # net.eval()
             f = open(
                 os.path.join(
                     config.output_dir, "prediction_results_test_set.csv"
@@ -810,16 +715,12 @@ def train_dgl(
             targets = []
             predictions = []
             with torch.no_grad():
-                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                ids = test_loader.dataset.ids
                 for dat, id in zip(test_loader, ids):
                     g, lg, lat, target = dat
                     out_data = best_model(
                         [g.to(device), lg.to(device), lat.to(device)]
                     )["out"]
-                    # out_data = net([g.to(device), lg.to(device)])["out"]
-                    # out_data = torch.exp(out_data.cpu())
-                    # print('target',target)
-                    # print('out_data',out_data)
                     top_p, top_class = torch.topk(torch.exp(out_data), k=1)
                     target = int(target.cpu().numpy().flatten().tolist()[0])
 
@@ -843,22 +744,20 @@ def train_dgl(
             and config.model.output_features > 1
         ):
             best_model.eval()
-            # net.eval()
             mem = []
             with torch.no_grad():
-                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                ids = test_loader.dataset.ids
                 for dat, id in zip(test_loader, ids):
                     g, lg, lat, target = dat
                     out_data = best_model(
                         [g.to(device), lg.to(device), lat.to(device)]
                     )["out"]
-                    # out_data = net([g.to(device), lg.to(device)])["out"]
                     out_data = out_data.detach().cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:
                         sc = pk.load(open("sc.pkl", "rb"))
                         out_data = list(
                             sc.transform(np.array(out_data).reshape(1, -1))[0]
-                        )  # [0][0]
+                        )
                     target = target.cpu().numpy().flatten().tolist()
                     info = {}
                     info["id"] = id
@@ -878,7 +777,6 @@ def train_dgl(
             and config.model.gradwise_weight == 0
         ):
             best_model.eval()
-            # net.eval()
             f = open(
                 os.path.join(
                     config.output_dir, "prediction_results_test_set.csv"
@@ -889,13 +787,12 @@ def train_dgl(
             targets = []
             predictions = []
             with torch.no_grad():
-                ids = test_loader.dataset.ids  # [test_loader.dataset.indices]
+                ids = test_loader.dataset.ids
                 for dat, id in zip(test_loader, ids):
                     g, lg, lat, target = dat
                     out_data = best_model(
                         [g.to(device), lg.to(device), lat.to(device)]
                     )["out"]
-                    # out_data = net([g.to(device), lg.to(device)])["out"]
                     out_data = out_data.cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:
                         sc = pk.load(
@@ -928,7 +825,6 @@ def train_dgl(
                 mean_absolute_error(np.array(targets), np.array(predictions)),
             )
             best_model.eval()
-            # net.eval()
             f = open(
                 os.path.join(
                     config.output_dir, "prediction_results_train_set.csv"
@@ -939,13 +835,12 @@ def train_dgl(
             targets = []
             predictions = []
             with torch.no_grad():
-                ids = train_loader.dataset.ids  # [test_loader.dataset.indices]
+                ids = train_loader.dataset.ids
                 for dat, id in zip(train_loader, ids):
                     g, lg, lat, target = dat
                     out_data = best_model(
                         [g.to(device), lg.to(device), lat.to(device)]
                     )["out"]
-                    # out_data = net([g.to(device), lg.to(device)])["out"]
                     out_data = out_data.cpu().numpy().tolist()
                     if config.standard_scalar_and_pca:
                         sc = pk.load(
@@ -955,10 +850,6 @@ def train_dgl(
                             np.array(out_data).reshape(-1, 1)
                         )[0][0]
                     target = target.cpu().numpy().flatten().tolist()
-                    # if len(target) == 1:
-                    #    target = target[0]
-                    # if len(out_data) == 1:
-                    #    out_data = out_data[0]
                     for ii, jj in zip(target, out_data):
                         f.write("%6f, %6f\n" % (ii, jj))
                         targets.append(ii)

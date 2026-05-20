@@ -26,6 +26,21 @@ from alignn.torch_graph_builder import (
     torchgraph_from_dgl,
 )
 
+# How often to commit the LMDB write transaction during a fresh build.
+# Holding a single transaction across all entries keeps every dirty page
+# resident in RAM until commit; flushing periodically caps peak memory.
+LMDB_COMMIT_EVERY = 100000
+
+
+def _mem_gb():
+    """Resident memory of the current process in GB (for diagnostics)."""
+    try:
+        import psutil
+
+        return psutil.Process(os.getpid()).memory_info().rss / 1e9
+    except Exception:
+        return float("nan")
+
 
 def prepare_pure_batch(batch, device=None, non_blocking=False):
     """Move a pure-torch batch to device; mirrors prepare_line_graph_batch."""
@@ -48,9 +63,7 @@ def _graph_to_torchgraph(g, lg=None):
 class PureTorchLMDBDataset(Dataset):
     """Dataset of crystal TorchGraphs using LMDB."""
 
-    def __init__(
-        self, lmdb_path: str = "", line_graph: bool = True, ids=None
-    ):
+    def __init__(self, lmdb_path: str = "", line_graph: bool = True, ids=None):
         """Open the LMDB at ``lmdb_path`` read-only."""
         super().__init__()
         self.lmdb_path = lmdb_path
@@ -124,6 +137,26 @@ def _attach_node_payload(
     g.ndata[key] = torch.as_tensor(tiled, dtype=dtype)
 
 
+def _lmdb_is_usable(tmp_name: str) -> bool:
+    """Return True if the LMDB at ``tmp_name`` contains at least one entry.
+
+    Guards against the empty-stub left behind when a previous build was
+    interrupted (OOM, Ctrl-C, etc.). Such stubs have an 8KB data.mdb but
+    zero records, and the read_existing fast path would silently return
+    a zero-length dataset if not caught.
+    """
+    if not os.path.exists(tmp_name):
+        return False
+    try:
+        env = lmdb.open(tmp_name, readonly=True, lock=False)
+        with env.begin() as txn:
+            n_entries = txn.stat()["entries"]
+        env.close()
+        return n_entries > 0
+    except Exception:
+        return False
+
+
 def get_torch_dataset(
     dataset=None,
     id_tag="jid",
@@ -158,7 +191,12 @@ def get_torch_dataset(
     with open(os.path.join(output_dir, tmp_name + "_data_range"), "w") as f:
         f.write(f"Max={np.max(vals)}\nMin={np.min(vals)}\n")
 
-    if os.path.exists(tmp_name) and read_existing:
+    print(f"[MEM] {tmp_name}: entry: {_mem_gb():.2f} GB")
+
+    # Fast path: reuse a previously built cache, but only if it actually
+    # contains records. An empty stub (8KB data.mdb) from an interrupted
+    # build would otherwise be returned as a zero-length dataset.
+    if read_existing and _lmdb_is_usable(tmp_name):
         # Validate the cache was built for the pure-torch backend.
         _env = lmdb.open(tmp_name, readonly=True, lock=False)
         with _env.begin() as _txn:
@@ -176,8 +214,21 @@ def get_torch_dataset(
                 )
         ids = [d[id_tag] for d in dataset]
         print("Reading dataset", tmp_name)
-        return PureTorchLMDBDataset(
+        ds = PureTorchLMDBDataset(
             lmdb_path=tmp_name, line_graph=line_graph, ids=ids
+        )
+        print(
+            f"[MEM] {tmp_name}: after PureTorchLMDBDataset (cached): "
+            f"{_mem_gb():.2f} GB"
+        )
+        return ds
+
+    # If read_existing was requested but the cache is unusable (empty
+    # stub or missing), warn so the user knows we're rebuilding.
+    if read_existing and os.path.exists(tmp_name):
+        print(
+            f"[WARN] {tmp_name}: read_existing=True but cache is "
+            "empty or unreadable; rebuilding from scratch."
         )
 
     ids = []
@@ -188,7 +239,14 @@ def get_torch_dataset(
 
         shutil.rmtree(tmp_name)
     env = lmdb.open(tmp_name, map_size=int(map_size))
-    with env.begin(write=True) as txn:
+
+    print(f"[MEM] {tmp_name}: before write loop: {_mem_gb():.2f} GB")
+
+    # Use periodic commits instead of a single giant write transaction.
+    # A single txn around millions of put() calls keeps every dirty page
+    # in RAM until commit and was the cause of OOM on memory-tight hosts.
+    txn = env.begin(write=True)
+    try:
         for idx, d in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
             atoms = Atoms.from_dict(d["atoms"])
@@ -214,9 +272,7 @@ def get_torch_dataset(
             lattice = torch.as_tensor(
                 atoms.lattice_mat, dtype=torch.get_default_dtype()
             )
-            label = torch.as_tensor(
-                d[target], dtype=torch.get_default_dtype()
-            )
+            label = torch.as_tensor(d[target], dtype=torch.get_default_dtype())
             natoms = len(d["atoms"]["elements"])
             if classification:
                 label = label.long()
@@ -252,7 +308,38 @@ def get_torch_dataset(
                 txn.put(f"{idx}".encode(), pk.dumps((g, lg, lattice, label)))
             else:
                 txn.put(f"{idx}".encode(), pk.dumps((g, lattice, label)))
+
+            # Drop this entry's full atomic-structure dict now that it's
+            # serialized into LMDB. The caller's list survives but its
+            # contents are released, freeing ~10-30 KB per entry. For
+            # 1.5M-entry datasets this is the difference between sitting
+            # at 24+ GB during the loop and staying at 3-4 GB.
+            dataset[idx] = None
+
+            # Flush dirty pages to disk every LMDB_COMMIT_EVERY entries.
+            if (idx + 1) % LMDB_COMMIT_EVERY == 0:
+                txn.commit()
+                txn = env.begin(write=True)
+                if (idx + 1) % (LMDB_COMMIT_EVERY * 5) == 0:
+                    print(
+                        f"[MEM] {tmp_name}: after {idx + 1} entries: "
+                        f"{_mem_gb():.2f} GB"
+                    )
+    finally:
+        # Commit whatever is left in the final partial batch.
+        txn.commit()
+
     env.close()
-    return PureTorchLMDBDataset(
+
+    print(f"[MEM] {tmp_name}: after write loop: {_mem_gb():.2f} GB")
+
+    ds = PureTorchLMDBDataset(
         lmdb_path=tmp_name, line_graph=line_graph, ids=ids
     )
+
+    print(
+        f"[MEM] {tmp_name}: after PureTorchLMDBDataset wrap: "
+        f"{_mem_gb():.2f} GB"
+    )
+
+    return ds

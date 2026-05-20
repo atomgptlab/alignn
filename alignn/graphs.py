@@ -14,15 +14,18 @@ import math
 from collections import defaultdict
 from typing import List, Tuple, Sequence, Optional
 import torch
+
 try:
     from dgl.data import DGLDataset
     import dgl
-except ImportError:  # DGL optional; DGL-dependent helpers will fail lazily
+except:  # DGL optional; DGL-dependent helpers will fail lazily
     dgl = None
 
     class DGLDataset:  # minimal stub so subclasses can still be defined
         def __init__(self, *args, **kwargs):
             pass
+
+
 from tqdm import tqdm
 from jarvis.core.atoms import Atoms
 
