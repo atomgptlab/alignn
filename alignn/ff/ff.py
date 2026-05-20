@@ -48,6 +48,7 @@ from matplotlib.gridspec import GridSpec
 from sklearn.metrics import mean_absolute_error
 from tqdm import tqdm
 from jarvis.core.utils import get_cache_dir
+
 # import torch
 from alignn.ff.calculators import (
     AlignnAtomwiseCalculator,
@@ -207,7 +208,8 @@ def get_figshare_model_prop(
 
 def default_path():
     """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
+    dpath = get_figshare_model_ff(model_name="mps")
+    # dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
     # dpath = get_figshare_model_ff(model_name="v5.27.2024")
     # dpath = get_figshare_model_ff(model_name="v8.29.2024_dft_3d")
     # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
