@@ -12,6 +12,7 @@
 * [Introduction](#intro)
 * [Installation](#install)
 * [Examples](#example)
+* [Colab notebooks](#colab)
 * [Pre-trained models](#pretrained)
 * [JARVIS-ALIGNN webapp](#webapp)
 * [ALIGNN-FF & ASE Calculator](#alignnff)
@@ -48,7 +49,24 @@ See [docs/training/](docs/training/) for dataset format and training examples:
 - [Force-field training](docs/training/force-field.md)
 - [Multi-GPU training](docs/training/multi-gpu.md)
 
-Google Colab notebooks are linked from [docs/index.md](docs/index.md).
+<a name="colab"></a>
+## Colab notebooks
+
+Ready-to-run notebooks covering property prediction, force-field
+training, and pretrained-model usage. Click a badge to open in Colab.
+
+[colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
+
+| Notebook | Open in Colab | Description |
+| --- | --- | --- |
+| Regression task (graph-wise prediction) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/alignn_jarvis_leaderboard.ipynb) | Single-output regression for 2D-material exfoliation energies. |
+| ML force-field training from scratch | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Train_ALIGNNFF_Mlearn.ipynb) | Train an ALIGNN-FF force field for Silicon. |
+| ALIGNN-FF: relaxation, EV curve, phonons, interfaces | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Structure_Relaxation_Phonons_Interface.ipynb) | Pretrained ALIGNN-FF for relaxation, EV curves, phonons, and interfaces. |
+| Scaling / timing comparison | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Timing_uMLFF.ipynb) | Scaling/timing analysis of universal MLFFs. |
+| Melt-Quench MD | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Fast_Melt_Quench.ipynb) | Generate amorphous structures via molecular dynamics. |
+| Miscellaneous training tasks | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb) | Single-output, multi-output (phonon/electron DOS), classification, and pretrained usage. |
+| Superconductor Tc | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Sc.ipynb) | Train a model for superconductor transition temperature. |
+| Build `id_prop.json` from VASP runs | [![Open In Colab][colab-badge]](https://colab.research.google.com/gist/knc6/5513b21f5fd83a7943509ffdf5c3608b/make_id_prop.ipynb) | Compile `vasprun.xml` files into `id_prop.json` for ALIGNN-FF training. |
 
 <a name="pretrained"></a>
 ## Using pre-trained models
@@ -66,7 +84,26 @@ See [docs/usage/webapps.md](docs/usage/webapps.md). Direct links: [AtomGPT ALIGN
 <a name="alignnff"></a>
 ## ALIGNN-FF ASE Calculator
 
-See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for example usage.
+```python
+from ase.build import bulk
+from alignn.ff.unified_calculator import (
+    AlignnUnifiedCalculator, AlignnUnifiedConfig)
+
+cfg = AlignnUnifiedConfig(
+    energy=True, forces=True, stress=True,
+    properties=["formation_energy_peratom", "optb88vdw_bandgap"],
+)
+calc = AlignnUnifiedCalculator(cfg)          # models loaded once, reused
+
+si = bulk("Si", "diamond", a=5.43); si.calc = calc
+si.get_potential_energy(); si.get_forces(); si.get_stress()
+print(calc.predictions())                    # extra property predictors
+```
+
+A single pydantic config selects the outputs (force-field
+energy/forces/stress plus any pretrained scalar property predictors).
+See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for more,
+and the ASE docs page *Calculators → ALIGNN*.
 
 <a name="performances"></a>
 ## Performances

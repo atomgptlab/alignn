@@ -16,6 +16,8 @@ def _ddp_mean(value: float, use_ddp: bool) -> float:
 def _unwrap(net):
     """Return underlying module from a DDP-wrapped model, else net itself."""
     return net.module if isinstance(net, DDP) else net
+
+
 from functools import partial
 from typing import Any, Dict, Union
 import torch
@@ -292,9 +294,7 @@ def train_dgl(
                 _amp_ctx = torch.autocast(
                     device_type="cuda",
                     dtype=torch.bfloat16,
-                    enabled=bool(
-                        getattr(config, "use_amp", False)
-                    )
+                    enabled=bool(getattr(config, "use_amp", False))
                     and torch.cuda.is_available(),
                 )
                 with _amp_ctx:
@@ -309,9 +309,7 @@ def train_dgl(
                         )
 
                     else:
-                        result = net(
-                            [dats[0].to(device), dats[1].to(device)]
-                        )
+                        result = net([dats[0].to(device), dats[1].to(device)])
                 # info = {}
                 info["target_out"] = []
                 info["pred_out"] = []
@@ -909,7 +907,18 @@ def train_dgl(
                     target = target.cpu().numpy().flatten().tolist()
                     if len(target) == 1:
                         target = target[0]
-                    f.write("%s, %6f, %6f\n" % (id, target, out_data))
+                    # out_data is a (possibly nested) list after .tolist();
+                    # unwrap single-output regression to a scalar, mirroring
+                    # the target handling above. Multi-output falls back to
+                    # a generic format so the write never raises.
+                    if isinstance(out_data, list):
+                        out_data = np.array(out_data).flatten().tolist()
+                        if len(out_data) == 1:
+                            out_data = out_data[0]
+                    if isinstance(target, list) or isinstance(out_data, list):
+                        f.write("%s, %s, %s\n" % (id, target, out_data))
+                    else:
+                        f.write("%s, %6f, %6f\n" % (id, target, out_data))
                     targets.append(target)
                     predictions.append(out_data)
             f.close()
