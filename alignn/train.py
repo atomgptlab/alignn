@@ -2,22 +2,6 @@
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
-
-
-def _ddp_mean(value: float, use_ddp: bool) -> float:
-    """All-reduce a Python scalar across ranks and return the mean."""
-    if not use_ddp or not dist.is_available() or not dist.is_initialized():
-        return float(value)
-    t = torch.tensor(float(value), device=torch.cuda.current_device())
-    dist.all_reduce(t, op=dist.ReduceOp.SUM)
-    return (t / dist.get_world_size()).item()
-
-
-def _unwrap(net):
-    """Return underlying module from a DDP-wrapped model, else net itself."""
-    return net.module if isinstance(net, DDP) else net
-
-
 from functools import partial
 from typing import Any, Dict, Union
 import torch
@@ -47,6 +31,21 @@ from alignn.utils import (
 )
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+
+def _ddp_mean(value: float, use_ddp: bool) -> float:
+    """All-reduce a Python scalar across ranks and return the mean."""
+    if not use_ddp or not dist.is_available() or not dist.is_initialized():
+        return float(value)
+    t = torch.tensor(float(value), device=torch.cuda.current_device())
+    dist.all_reduce(t, op=dist.ReduceOp.SUM)
+    return (t / dist.get_world_size()).item()
+
+
+def _unwrap(net):
+    """Return underlying module from a DDP-wrapped model, else net."""
+    return net.module if isinstance(net, DDP) else net
+
 
 # torch.autograd.detect_anomaly()
 

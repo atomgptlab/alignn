@@ -35,7 +35,6 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-import numpy as np
 import torch
 from ase.calculators.calculator import Calculator, all_changes
 from pydantic import BaseModel, Field, field_validator

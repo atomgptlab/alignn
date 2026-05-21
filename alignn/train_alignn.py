@@ -355,11 +355,9 @@ def train_for_folder(
             try:
                 tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
                 model = ALIGNNAtomWise(tmp)  # config.model)
-            except:
+            except Exception:
                 tmp = ALIGNNAtomWisePureConfig(**rest_config["model"])
                 model = ALIGNNAtomWisePure(tmp)  # config.model)
-                pass
-                # from alignn.models.alignn_atomwise_pure import ALIGNNAtomWisePureConfig
             print("Rest config", tmp)
             print("model", model)
             model.load_state_dict(

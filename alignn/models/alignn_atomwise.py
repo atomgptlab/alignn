@@ -12,7 +12,7 @@ try:
     import dgl
     import dgl.function as fn
     from dgl.nn import AvgPooling
-except:  # DGL optional; this module only usable if DGL installed
+except Exception:  # DGL optional; module only usable if DGL installed
     dgl = None
     fn = None
     AvgPooling = None

@@ -11,7 +11,7 @@ try:
     import dgl
     import dgl.function as fn
     from dgl.nn import AvgPooling
-except:
+except Exception:
     dgl = None
     fn = None
     AvgPooling = None

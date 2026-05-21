@@ -18,11 +18,14 @@ import torch
 try:
     from dgl.data import DGLDataset
     import dgl
-except:  # DGL optional; DGL-dependent helpers will fail lazily
+except Exception:  # DGL optional; DGL-dependent helpers fail lazily
     dgl = None
 
-    class DGLDataset:  # minimal stub so subclasses can still be defined
+    class DGLDataset:  # noqa: D101 - minimal stub for subclasses
+        """Minimal stub so subclasses can be defined without DGL."""
+
         def __init__(self, *args, **kwargs):
+            """Accept and ignore any arguments."""
             pass
 
 

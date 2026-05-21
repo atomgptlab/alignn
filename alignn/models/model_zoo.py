@@ -73,7 +73,7 @@ class ModelZoo(nn.Module):
     def predict_all(self, graph) -> Dict[str, Dict[str, torch.Tensor]]:
         return {p: self.predict(graph, p) for p in self._models}
 
-    # default forward = predict_all so torch.compile / hooks see one entry point
+    # default forward = predict_all so torch.compile sees one entry point
     def forward(self, graph) -> Dict[str, Dict[str, torch.Tensor]]:
         return self.predict_all(graph)
 
@@ -169,7 +169,8 @@ class LazyModelZoo(ModelZoo):
     def __init__(self, map_location: str = "cpu"):
         super().__init__()
         self._map_location = map_location
-        self._lazy: Dict[str, dict] = {}  # name -> {checkpoint, config, is_efs}
+        # name -> {checkpoint, config, is_efs}
+        self._lazy: Dict[str, dict] = {}
 
     def add_lazy(
         self,
@@ -199,7 +200,9 @@ class LazyModelZoo(ModelZoo):
             raise KeyError(name)
         entry = self._lazy[name]
         model = ALIGNNAtomWisePure(entry["config"])
-        state = torch.load(entry["checkpoint"], map_location=self._map_location)
+        state = torch.load(
+            entry["checkpoint"], map_location=self._map_location
+        )
         if isinstance(state, dict) and "model" in state:
             state = state["model"]
         model.load_state_dict(state)

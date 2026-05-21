@@ -1,4 +1,4 @@
-"""Pure-PyTorch MD integrators: Velocity-Verlet (NVE) and Langevin (NVT, BAOAB).
+"""Pure-PyTorch MD integrators: Velocity-Verlet and Langevin (BAOAB).
 
 State kept entirely on-device. Unit system follows ASE:
     energy eV, length Å, mass amu, time fs, temperature K.
@@ -9,7 +9,8 @@ which we bake in as `EV_AMU_A_PER_FS2`.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional
-import math, time
+import math
+import time
 import torch
 
 KB_EV = 8.617333262e-5                # Boltzmann, eV/K
@@ -26,9 +27,15 @@ def wrap_pbc(positions: torch.Tensor, cell: torch.Tensor) -> torch.Tensor:
     return frac @ cell
 
 
-def kinetic_energy(masses: torch.Tensor, velocities: torch.Tensor) -> torch.Tensor:
-    # KE in eV: 0.5 * m * v²  with m in amu, v in Å/fs -> multiply by 1/EV_AMU_A_PER_FS2
-    return 0.5 * (masses * (velocities ** 2).sum(dim=-1)).sum() / EV_AMU_A_PER_FS2
+def kinetic_energy(
+    masses: torch.Tensor, velocities: torch.Tensor
+) -> torch.Tensor:
+    """Return kinetic energy in eV (m in amu, v in Å/fs)."""
+    # 0.5 * m * v², converted from amu·Å²/fs² to eV
+    return (
+        0.5 * (masses * (velocities ** 2).sum(dim=-1)).sum()
+        / EV_AMU_A_PER_FS2
+    )
 
 
 def instantaneous_temperature(masses, velocities):
@@ -37,7 +44,9 @@ def instantaneous_temperature(masses, velocities):
     return 2.0 * ke / (n_dof * KB_EV)
 
 
-def maxwell_boltzmann(masses: torch.Tensor, T: float, generator=None) -> torch.Tensor:
+def maxwell_boltzmann(
+    masses: torch.Tensor, T: float, generator=None
+) -> torch.Tensor:
     # sigma_v = sqrt(kT/m), in Å/fs after unit conversion
     sigma = torch.sqrt(KB_EV * T * EV_AMU_A_PER_FS2 / masses).unsqueeze(-1)
     v = torch.randn((masses.numel(), 3), device=masses.device,
@@ -107,10 +116,18 @@ class Langevin:
         # A: half-drift
         positions = positions + 0.5 * self.dt * velocities
         # O: Ornstein-Uhlenbeck in velocity
-        sigma = torch.sqrt(KB_EV * self.T * EV_AMU_A_PER_FS2 / self.masses).unsqueeze(-1)
-        noise = torch.randn_like(velocities) if self.generator is None \
-                else torch.randn(velocities.shape, device=velocities.device,
-                                 dtype=velocities.dtype, generator=self.generator)
+        sigma = torch.sqrt(
+            KB_EV * self.T * EV_AMU_A_PER_FS2 / self.masses
+        ).unsqueeze(-1)
+        if self.generator is None:
+            noise = torch.randn_like(velocities)
+        else:
+            noise = torch.randn(
+                velocities.shape,
+                device=velocities.device,
+                dtype=velocities.dtype,
+                generator=self.generator,
+            )
         velocities = self.c1 * velocities + self.c3 * sigma * noise
         # A: half-drift
         positions = positions + 0.5 * self.dt * velocities
@@ -158,7 +175,9 @@ class NVTBerendsen:
         T_now = instantaneous_temperature(self.masses, velocities)
         # Guard against T_now == 0 early on
         scale = torch.sqrt(
-            1.0 + (self.dt / self.taut) * (self.T / T_now.clamp_min(1e-6) - 1.0)
+            1.0
+            + (self.dt / self.taut)
+            * (self.T / T_now.clamp_min(1e-6) - 1.0)
         )
         velocities = velocities * scale
         self._forces = new_forces
@@ -258,7 +277,9 @@ class NVTNoseHooverChain:
         self._Nf = Nf
         self._kT = kT
         tau2 = self.taut ** 2
-        Q = torch.full((self.chain_length,), kT * tau2, device=device, dtype=dtype)
+        Q = torch.full(
+            (self.chain_length,), kT * tau2, device=device, dtype=dtype
+        )
         Q[0] = Nf * kT * tau2
         self._Q = Q
 
@@ -275,16 +296,18 @@ class NVTNoseHooverChain:
         M = self.chain_length
         K = kinetic_energy(self.masses, velocities)       # eV
         # --- reverse pass (top of chain down) ---
-        G_M = (Q[M-2] * v_xi[M-2] ** 2 - self._kT) / Q[M-1] if M >= 2 else \
-              (2 * K - self._Nf * self._kT) / Q[0]
-        v_xi[M-1] = v_xi[M-1] + G_M * dthalf
+        if M >= 2:
+            G_M = (Q[M - 2] * v_xi[M - 2] ** 2 - self._kT) / Q[M - 1]
+        else:
+            G_M = (2 * K - self._Nf * self._kT) / Q[0]
+        v_xi[M - 1] = v_xi[M - 1] + G_M * dthalf
         for i in range(M - 2, -1, -1):
             factor = torch.exp(-dtqtr * v_xi[i + 1])
             v_xi[i] = v_xi[i] * factor
             if i == 0:
                 G_i = (2 * K - self._Nf * self._kT) / Q[0]
             else:
-                G_i = (Q[i-1] * v_xi[i-1] ** 2 - self._kT) / Q[i]
+                G_i = (Q[i - 1] * v_xi[i - 1] ** 2 - self._kT) / Q[i]
             v_xi[i] = v_xi[i] + G_i * dthalf
             v_xi[i] = v_xi[i] * factor
         # --- rescale particle velocities ---
@@ -298,12 +321,12 @@ class NVTNoseHooverChain:
             if i == 0:
                 G_i = (2 * K - self._Nf * self._kT) / Q[0]
             else:
-                G_i = (Q[i-1] * v_xi[i-1] ** 2 - self._kT) / Q[i]
+                G_i = (Q[i - 1] * v_xi[i - 1] ** 2 - self._kT) / Q[i]
             v_xi[i] = v_xi[i] + G_i * dthalf
             v_xi[i] = v_xi[i] * factor
         if M >= 2:
-            G_M = (Q[M-2] * v_xi[M-2] ** 2 - self._kT) / Q[M-1]
-            v_xi[M-1] = v_xi[M-1] + G_M * dthalf
+            G_M = (Q[M - 2] * v_xi[M - 2] ** 2 - self._kT) / Q[M - 1]
+            v_xi[M - 1] = v_xi[M - 1] + G_M * dthalf
         return velocities
 
     def step(self, positions, velocities):
@@ -345,15 +368,15 @@ def run(
         if (i % log_every) == 0 or i == nsteps - 1:
             ke = kinetic_energy(integrator.masses, velocities).item()
             T = instantaneous_temperature(integrator.masses, velocities).item()
-            pe = integrator.forces_fn(positions)[0].item() \
-                 if hasattr(integrator, "_forces") and integrator._forces is None \
-                 else None
             row = {"step": i, "time_fs": i * integrator.dt, "T_K": T,
                    "KE_eV": ke, "wall_s": time.time() - t0}
             hist.append(row)
             if callback is not None:
                 callback(i, row)
             else:
-                print(f"step {i:6d}  t={row['time_fs']:8.1f} fs  "
-                      f"T={T:7.1f} K  KE={ke:10.4f} eV  wall={row['wall_s']:6.1f}s")
+                print(
+                    f"step {i:6d}  t={row['time_fs']:8.1f} fs  "
+                    f"T={T:7.1f} K  KE={ke:10.4f} eV  "
+                    f"wall={row['wall_s']:6.1f}s"
+                )
     return positions, velocities, hist

@@ -49,8 +49,10 @@ class AlignnForces:
             cutoff=self.cutoff, max_neighbors=self.max_neighbors,
             atom_features="cgcnn", use_canonize=True,
         )
-        g = g.to(self.device); lg = lg.to(self.device)
-        tg = torchgraph_from_dgl(g); tlg = torchgraph_from_dgl(lg)
+        g = g.to(self.device)
+        lg = lg.to(self.device)
+        tg = torchgraph_from_dgl(g)
+        tlg = torchgraph_from_dgl(lg)
         for d in (tg.ndata, tg.edata, tlg.ndata, tlg.edata):
             for k, v in list(d.items()):
                 if v.is_floating_point():
@@ -64,7 +66,11 @@ class AlignnForces:
         # model sets r.requires_grad_(True) internally; energy grad wrt r
         # gives per-edge forces, aggregated to per-atom in the model's head.
         out = self.model((tg, tlg, self.cell))
-        energy = out["out"].sum() if "out" in out else next(iter(out.values())).sum()
+        energy = (
+            out["out"].sum()
+            if "out" in out
+            else next(iter(out.values())).sum()
+        )
         if "grad" in out:
             forces = out["grad"].detach()
         else:

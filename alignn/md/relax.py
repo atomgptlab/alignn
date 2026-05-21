@@ -60,7 +60,10 @@ class FIRE:
                           f"|F|max={fnorm_max:9.4f} eV/Å  dt={dt:5.3f} fs  "
                           f"α={alpha:5.3f}")
             if fnorm_max < fmax:
-                print(f"converged at step {step}: |F|max = {fnorm_max:.5f} < {fmax}")
+                print(
+                    f"converged at step {step}: "
+                    f"|F|max = {fnorm_max:.5f} < {fmax}"
+                )
                 break
 
             # FIRE velocity mix: v ← (1-α) v + α |v| F̂
