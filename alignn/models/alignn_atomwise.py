@@ -16,7 +16,7 @@ except Exception:  # DGL optional; module only usable if DGL installed
     dgl = None
     fn = None
     AvgPooling = None
-    print("WARNING: No DGL, might fail")
+    # print("WARNING: No DGL, might fail")
 import numpy as np
 import torch
 

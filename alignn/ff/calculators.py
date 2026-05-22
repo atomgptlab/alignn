@@ -194,9 +194,9 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         output_dir=None,
         batch_stress=True,
         force_mult_natoms=False,
-        force_mult_batchsize=True,
+        force_mult_batchsize=False,
         force_multiplier=1,
-        stress_wt=0.05,
+        stress_wt=1.00,
     ):
         """Initialize class."""
         super(AlignnAtomwiseCalculator, self).__init__(
