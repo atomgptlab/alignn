@@ -1,0 +1,40 @@
+# Native-pair-style melt-quench for Si using pair_alignn.
+
+units           metal
+atom_style      atomic
+boundary        p p p
+read_data       si.data
+mass            1 28.0855
+
+pair_style      alignn
+pair_coeff      * * alignn_ff.pt  Si
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+timestep        0.001
+thermo          50
+thermo_style    custom step temp pe ke etotal press vol
+dump            traj all custom 100 si.lammpstrj id type x y z
+
+velocity        all create 300.0 12345 mom yes rot yes
+fix             nvt1 all nvt temp 300.0 300.0 0.1
+run             200
+unfix           nvt1
+
+fix             nvt2 all nvt temp 300.0 3500.0 0.1
+run             1000
+unfix           nvt2
+
+fix             nvt3 all nvt temp 3500.0 3500.0 0.1
+run             2000
+unfix           nvt3
+
+fix             nvt4 all nvt temp 3500.0 300.0 0.1
+run             4000
+unfix           nvt4
+
+fix             nvt5 all nvt temp 300.0 300.0 0.1
+run             2000
+
+write_data      si_quenched.data

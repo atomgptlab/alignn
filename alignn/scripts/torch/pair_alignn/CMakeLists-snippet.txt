@@ -1,0 +1,27 @@
+# Add to LAMMPS cmake/CMakeLists.txt to enable pair_alignn.
+# Or keep as a standalone external package.
+
+option(PKG_USER-ALIGNN "Build USER-ALIGNN with libtorch" OFF)
+
+if(PKG_USER-ALIGNN)
+  find_package(Torch REQUIRED)
+
+  file(GLOB ALIGNN_SOURCES
+       ${LAMMPS_SOURCE_DIR}/USER-ALIGNN/pair_alignn.cpp)
+  target_sources(lammps PRIVATE ${ALIGNN_SOURCES})
+  target_include_directories(lammps PRIVATE ${LAMMPS_SOURCE_DIR}/USER-ALIGNN)
+  target_link_libraries(lammps PRIVATE ${TORCH_LIBRARIES})
+  target_compile_features(lammps PRIVATE cxx_std_17)
+
+  # libtorch ABI flag — must match how libtorch was built.
+  if(DEFINED ENV{TORCH_CXX11_ABI})
+    target_compile_definitions(lammps PRIVATE _GLIBCXX_USE_CXX11_ABI=$ENV{TORCH_CXX11_ABI})
+  endif()
+endif()
+
+# Build:
+#   cd build
+#   cmake ../cmake -DPKG_USER-ALIGNN=ON \
+#         -DCMAKE_PREFIX_PATH=/path/to/libtorch \
+#         -DCMAKE_BUILD_TYPE=Release
+#   make -j

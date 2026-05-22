@@ -3,12 +3,21 @@
 A prototype crystal line graph network dgl implementation.
 """
 
+from __future__ import annotations
+
 from typing import Tuple, Union
 from torch.autograd import grad
-import dgl
-import dgl.function as fn
+
+try:
+    import dgl
+    import dgl.function as fn
+    from dgl.nn import AvgPooling
+except Exception:  # DGL optional; module only usable if DGL installed
+    dgl = None
+    fn = None
+    AvgPooling = None
+    print("WARNING: No DGL, might fail")
 import numpy as np
-from dgl.nn import AvgPooling
 import torch
 
 # from dgl.nn.functional import edge_softmax

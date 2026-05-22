@@ -14,6 +14,10 @@ from alignn.models.ealignn_atomwise import (
     eALIGNNAtomWiseConfig,
 )
 from alignn.models.alignn import ALIGNN, ALIGNNConfig
+from alignn.models.alignn_atomwise_pure import (
+    ALIGNNAtomWisePure,
+    ALIGNNAtomWisePureConfig,
+)
 import matplotlib.pyplot as plt  # noqa
 import zipfile
 import numpy as np
@@ -248,17 +252,24 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             )
         if self.model is None:
 
-            if self.config["model"]["name"] == "alignn_atomwise":
+            model = None
+            mname = self.config["model"]["name"]
+            if mname == "alignn_atomwise":
                 model = ALIGNNAtomWise(
                     ALIGNNAtomWiseConfig(**self.config["model"])
                 )
-            elif self.config["model"]["name"] == "alignn":
+            elif mname == "alignn_atomwise_pure":
+                model = ALIGNNAtomWisePure(
+                    ALIGNNAtomWisePureConfig(**self.config["model"])
+                )
+            elif mname == "alignn":
                 model = ALIGNN(ALIGNNConfig(**self.config["model"]))
-            elif self.config["model"]["name"] == "ealignn_atomwise":
+            elif mname == "ealignn_atomwise":
                 model = eALIGNNAtomWise(
                     eALIGNNAtomWiseConfig(**self.config["model"])
                 )
-            model.state_dict()
+            if model is None:
+                raise ValueError(f"Unsupported model name '{mname}' in config")
             if "atomwise" in self.config["model"]["name"]:
                 model.load_state_dict(
                     torch.load(
@@ -362,7 +373,8 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         #    / 160.21766208
         # )
         if "atomwise" in self.config["model"]["name"]:
-            energy = result["out"].detach().cpu().numpy()
+            # energy = result["out"].squeeze().detach().cpu().numpy()
+            energy = result["out"].detach().cpu().item()
         else:
             energy = result.detach().cpu().numpy()
         if self.intensive:
@@ -378,6 +390,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             "forces": forces,
             "stress": stress,
         }
+        # print("self.results",self.results)
 
 
 class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):

@@ -10,7 +10,18 @@ from jarvis.db.figshare import data as jdata
 from tqdm import tqdm
 import math
 from jarvis.db.jsonutils import dumpjson
-from dgl.dataloading import GraphDataLoader
+
+try:
+    from dgl.dataloading import GraphDataLoader
+except Exception:  # pure-torch path; fall back to stdlib DataLoader
+    from torch.utils.data import DataLoader as _TorchDataLoader
+
+    def GraphDataLoader(*args, use_ddp=False, **kwargs):
+        """Fall back to torch DataLoader when DGL is unavailable."""
+        kwargs.pop("use_ddp", None)
+        return _TorchDataLoader(*args, **kwargs)
+
+
 import pickle as pk
 from sklearn.preprocessing import StandardScaler
 
@@ -145,6 +156,7 @@ def get_train_val_loaders(
     cutoff: float = 8.0,
     cutoff_extra: float = 3.0,
     max_neighbors: int = 12,
+    three_body_cutoff: Optional[float] = None,
     classification_threshold: Optional[float] = None,
     target_multiplication_factor: Optional[float] = None,
     standard_scalar_and_pca=False,
@@ -154,10 +166,15 @@ def get_train_val_loaders(
     world_size=0,
     rank=0,
     use_lmdb: bool = True,
+    use_pure_torch: bool = False,
+    read_existing: bool = False,
     dtype="float32",
 ):
     """Help function to set up JARVIS train and val dataloaders."""
-    if use_lmdb:
+    if use_pure_torch:
+        print("Using pure-torch LMDB dataset (no DGL).")
+        from alignn.pure_lmdb_dataset import get_torch_dataset
+    elif use_lmdb:
         print("Using LMDB dataset.")
         from alignn.lmdb_dataset import get_torch_dataset
     else:
@@ -383,6 +400,8 @@ def get_train_val_loaders(
             cutoff=cutoff,
             cutoff_extra=cutoff_extra,
             max_neighbors=max_neighbors,
+            three_body_cutoff=three_body_cutoff,
+            read_existing=read_existing,
             classification=classification_threshold is not None,
             output_dir=output_dir,
             sampler=train_sampler,
@@ -409,6 +428,7 @@ def get_train_val_loaders(
                 cutoff_extra=cutoff_extra,
                 sampler=val_sampler,
                 max_neighbors=max_neighbors,
+                three_body_cutoff=three_body_cutoff,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,
@@ -462,7 +482,20 @@ def get_train_val_loaders(
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,
+            persistent_workers=(workers > 0),
+            prefetch_factor=2 if workers > 0 else None,
         )
+        # train_loader = GraphDataLoader(
+        #    # train_loader = DataLoader(
+        #    train_data,
+        #    batch_size=batch_size,
+        #    shuffle=True,
+        #    collate_fn=collate_fn,
+        #    drop_last=True,
+        #    num_workers=workers,
+        #    pin_memory=pin_memory,
+        #    use_ddp=use_ddp,
+        # )
 
         val_loader = GraphDataLoader(
             # val_loader = DataLoader(
@@ -474,7 +507,20 @@ def get_train_val_loaders(
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,
+            persistent_workers=(workers > 0),
+            prefetch_factor=2 if workers > 0 else None,
         )
+        # val_loader = GraphDataLoader(
+        #    # val_loader = DataLoader(
+        #    val_data,
+        #    batch_size=batch_size,
+        #    shuffle=False,
+        #    collate_fn=collate_fn,
+        #    drop_last=True,
+        #    num_workers=workers,
+        #    pin_memory=pin_memory,
+        #    use_ddp=use_ddp,
+        # )
 
         test_loader = (
             GraphDataLoader(
@@ -488,9 +534,26 @@ def get_train_val_loaders(
                 pin_memory=pin_memory,
                 use_ddp=use_ddp,
             )
-            if len(dataset_test) > 0
+            if test_data is not None
             else None
         )
+
+        # All loaders constructed; safe to free the in-memory dataset
+        # lists. With 1.5M-entry datasets these can hold tens of GB of
+        # full atomic-structure dicts, and they are no longer needed
+        # once the LMDB caches are built and the loaders reference
+        # them via the Dataset wrappers.
+        del dataset_train
+        del dataset_val
+        del dataset_test
+        del dat
+        try:
+            del d
+        except NameError:
+            pass
+        import gc
+
+        gc.collect()
 
         if save_dataloader:
             torch.save(train_loader, train_sample)

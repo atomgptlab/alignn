@@ -28,6 +28,7 @@ dataset (~75,000 materials and 4M+ energy/force entries) and supports any combin
 ## Quick links
 
 - [Install ALIGNN](installation.md)
+- [Colab notebooks](examples-colab.md)
 - [Train your first model](training/single-output-regression.md)
 - [Use a pretrained model](pretrained/index.md)
 - [Run the ALIGNN-FF ASE calculator](usage/ase-calculator.md)

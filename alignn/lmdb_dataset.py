@@ -1,5 +1,7 @@
 """Module to prepare LMDB ALIGNN dataset."""
 
+from __future__ import annotations
+
 import os
 import numpy as np
 import lmdb
@@ -11,7 +13,17 @@ from torch.utils.data import Dataset
 import torch
 from tqdm import tqdm
 from typing import List, Tuple
-import dgl
+
+try:
+    import dgl
+except ImportError:
+    dgl = None
+
+
+# How often to commit the LMDB write transaction during a fresh build.
+# Holding a single transaction across all entries keeps every dirty page
+# resident in RAM until commit; flushing periodically caps peak memory.
+LMDB_COMMIT_EVERY = 5000
 
 
 def prepare_line_graph_batch(
@@ -86,7 +98,7 @@ class TorchLMDBDataset(Dataset):
 
     @staticmethod
     def collate_line_graph(
-        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]]
+        samples: List[Tuple[dgl.DGLGraph, dgl.DGLGraph, torch.Tensor]],
     ):
         """Dataloader helper to batch graphs cross `samples`."""
         graphs, line_graphs, lattices, labels = map(list, zip(*samples))
@@ -108,6 +120,16 @@ class TorchLMDBDataset(Dataset):
             )
 
 
+def _mem_gb():
+    """Resident memory of the current process in GB (for diagnostics)."""
+    try:
+        import psutil
+
+        return psutil.Process(os.getpid()).memory_info().rss / 1e9
+    except Exception:
+        return float("nan")
+
+
 def get_torch_dataset(
     dataset=[],
     id_tag="jid",
@@ -124,12 +146,13 @@ def get_torch_dataset(
     cutoff=8.0,
     cutoff_extra=3.0,
     max_neighbors=12,
+    three_body_cutoff=None,
     classification=False,
     sampler=None,
     output_dir=".",
     tmp_name="dataset",
     map_size=1e12,
-    read_existing=True,
+    read_existing=False,
     dtype="float32",
 ):
     """Get Torch Dataset with LMDB."""
@@ -142,21 +165,59 @@ def get_torch_dataset(
     line = "Min=" + str(np.min(vals)) + "\n"
     f.write(line)
     f.close()
+
+    print(f"[MEM] {tmp_name}: entry: {_mem_gb():.2f} GB")
+
     ids = []
     if os.path.exists(tmp_name) and read_existing:
+        # Validate the cache backend matches (DGL). A previous run with
+        # model.name="alignn_atomwise_pure" would have left TorchGraph
+        # pickles here, which dgl.batch can't consume.
+        _env = lmdb.open(tmp_name, readonly=True, lock=False)
+        with _env.begin() as _txn:
+            _probe = _txn.get(b"0")
+        _env.close()
+        if _probe is not None:
+            _sample = pk.loads(_probe)
+            _graph = _sample[0]
+            if dgl is None or not isinstance(_graph, dgl.DGLGraph):
+                raise RuntimeError(
+                    f"LMDB cache at '{tmp_name}' contains "
+                    f"{type(_graph).__name__} records, not DGLGraph. "
+                    "Delete the stale cache (e.g. `rm -rf "
+                    f"{tmp_name}`) and rerun — it was built for a "
+                    "different model backend."
+                )
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
         dat = TorchLMDBDataset(
             lmdb_path=tmp_name, line_graph=line_graph, ids=ids
         )
         print("Reading dataset", tmp_name)
+        print(
+            f"[MEM] {tmp_name}: after TorchLMDBDataset (cached): "
+            f"{_mem_gb():.2f} GB"
+        )
         return dat
+
     ids = []
+    # Fresh build: wipe any pre-existing cache dir to avoid mixing old
+    # records (possibly from a different model backend) with new writes.
+    if os.path.exists(tmp_name):
+        import shutil
+
+        shutil.rmtree(tmp_name)
     env = lmdb.open(tmp_name, map_size=int(map_size))
-    with env.begin(write=True) as txn:
+
+    print(f"[MEM] {tmp_name}: before write loop: {_mem_gb():.2f} GB")
+
+    # Use periodic commits instead of one giant transaction. A single
+    # write txn around 1.5M put() calls keeps every dirty page in RAM
+    # until commit and was the cause of OOM on 62 GB hosts.
+    txn = env.begin(write=True)
+    try:
         for idx, (d) in tqdm(enumerate(dataset), total=len(dataset)):
             ids.append(d[id_tag])
-            # g, lg = Graph.atom_dgl_multigraph(
             atoms = Atoms.from_dict(d["atoms"])
             g = Graph.atom_dgl_multigraph(
                 atoms,
@@ -167,6 +228,7 @@ def get_torch_dataset(
                 use_canonize=use_canonize,
                 cutoff_extra=cutoff_extra,
                 neighbor_strategy=neighbor_strategy,
+                three_body_cutoff=three_body_cutoff,
                 dtype=dtype,
             )
             if line_graph:
@@ -176,10 +238,8 @@ def get_torch_dataset(
             )
             label = torch.tensor(d[target]).type(torch.get_default_dtype())
             natoms = len(d["atoms"]["elements"])
-            # print('label',label,label.view(-1).long())
             if classification:
                 label = label.long()
-                # label = label.view(-1).long()
             if "extra_features" in d:
                 g.ndata["extra_features"] = torch.tensor(
                     [d["extra_features"] for n in range(natoms)]
@@ -189,8 +249,6 @@ def get_torch_dataset(
                     np.array(d[target_atomwise])
                 ).type(torch.get_default_dtype())
             if target_grad is not None and target_grad != "":
-                # print('grad', np.array(d[target_grad]))
-                # print('grad shape',np.array(d[target_grad]).shape)
                 arr = np.array(d[target_grad])
                 try:
                     g.ndata[target_grad] = torch.tensor(arr).type(
@@ -201,7 +259,6 @@ def get_torch_dataset(
                     g.ndata[target_grad] = torch.tensor(arr).type(
                         torch.get_default_dtype()
                     )
-                    # print('arr',arr.shape)
             if target_stress is not None and target_stress != "":
                 stress = np.array(d[target_stress])
                 g.ndata[target_stress] = torch.tensor(
@@ -216,17 +273,38 @@ def get_torch_dataset(
                     ([additional_output for ii in range(natoms)])
                 ).type(torch.get_default_dtype())
 
-            # labels.append(label)
             if line_graph:
                 serialized_data = pk.dumps((g, lg, lattice, label))
             else:
                 serialized_data = pk.dumps((g, lattice, label))
             txn.put(f"{idx}".encode(), serialized_data)
 
+            # Flush dirty pages to disk every LMDB_COMMIT_EVERY entries.
+            if (idx + 1) % LMDB_COMMIT_EVERY == 0:
+                txn.commit()
+                txn = env.begin(write=True)
+                if (idx + 1) % (LMDB_COMMIT_EVERY * 20) == 0:
+                    print(
+                        f"[MEM] {tmp_name}: after {idx + 1} entries: "
+                        f"{_mem_gb():.2f} GB"
+                    )
+    finally:
+        # Commit whatever is left in the final partial batch.
+        txn.commit()
+
     env.close()
+
+    print(f"[MEM] {tmp_name}: after write loop: {_mem_gb():.2f} GB")
+
     lmdb_dataset = TorchLMDBDataset(
         lmdb_path=tmp_name, line_graph=line_graph, ids=ids
     )
+
+    print(
+        f"[MEM] {tmp_name}: after TorchLMDBDataset wrap: "
+        f"{_mem_gb():.2f} GB"
+    )
+
     return lmdb_dataset
 
 

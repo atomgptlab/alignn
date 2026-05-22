@@ -1,11 +1,16 @@
 """Shared model-building components."""
 
-from typing import Optional, Callable
+from typing import Optional, Callable, TYPE_CHECKING
 import numpy as np
 import torch
 import torch.nn as nn
-import dgl
 from typing import Tuple
+
+# Lazy-import dgl: only DGL-graph-specific helpers below need it, and
+# we want importing this module to stay DGL-free so the pure-torch
+# model can be loaded in environments without DGL.
+if TYPE_CHECKING:  # pragma: no cover
+    import dgl
 
 
 class RBFExpansion(nn.Module):
@@ -28,14 +33,14 @@ class RBFExpansion(nn.Module):
         )
 
         if lengthscale is None:
-            # SchNet-style
-            # set lengthscales relative to granularity of RBF expansion
-            self.lengthscale = np.diff(self.centers).mean()
-            self.gamma = 1 / self.lengthscale
-
+            # SchNet-style: set lengthscales relative to RBF granularity.
+            # Cast to Python float so TorchScript can type-infer the
+            # attribute (numpy scalars aren't recognized).
+            self.lengthscale = float(np.diff(self.centers).mean())
+            self.gamma = 1.0 / self.lengthscale
         else:
-            self.lengthscale = lengthscale
-            self.gamma = 1 / (lengthscale**2)
+            self.lengthscale = float(lengthscale)
+            self.gamma = 1.0 / (self.lengthscale**2)
 
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
         """Apply RBF expansion to interatomic distance tensor."""
@@ -44,7 +49,7 @@ class RBFExpansion(nn.Module):
         )
 
 
-def compute_pair_vector_and_distance(g: dgl.DGLGraph):
+def compute_pair_vector_and_distance(g: "dgl.DGLGraph"):
     """Calculate bond vectors and distances using dgl graphs."""
     # print('g.edges()',g.ndata["cart_coords"][g.edges()[1]].shape,g.edata["pbc_offshift"].shape)
     dst_pos = g.ndata["cart_coords"][g.edges()[1]] + g.edata["images"]
@@ -127,10 +132,10 @@ def compute_cartesian_coordinates(g, lattice, dtype=torch.float32):
 
 
 def lightweight_line_graph(
-    input_graph: dgl.DGLGraph,
+    input_graph: "dgl.DGLGraph",
     feature_name: str,
     filter_condition: Callable[[torch.Tensor], torch.Tensor],
-) -> dgl.DGLGraph:
+) -> "dgl.DGLGraph":
     """Make the line graphs lightweight with preserved node ordering.
     Handles both batched and unbatched graphs.
 
@@ -143,6 +148,8 @@ def lightweight_line_graph(
         New DGL graph with filtered edges preserving original node ordering
     """
     # Check if graph is batched
+    import dgl
+
     is_batched = (
         hasattr(input_graph, "batch_size") and input_graph.batch_size > 1
     )
@@ -223,10 +230,10 @@ def lightweight_line_graph(
 
 
 def lightweight_line_graph1(
-    input_graph: dgl.DGLGraph,
+    input_graph: "dgl.DGLGraph",
     feature_name: str,
     filter_condition: Callable[[torch.Tensor], torch.Tensor],
-) -> dgl.DGLGraph:
+) -> "dgl.DGLGraph":
     """Make the line graphs lightweight with preserved node ordering.
 
     Args:
@@ -237,6 +244,8 @@ def lightweight_line_graph1(
     Returns:
         Filtered edges while preserving original node ordering
     """
+    import dgl
+
     # Get active edges based on filter condition
     active_edges = torch.logical_not(
         filter_condition(input_graph.edata[feature_name])
@@ -317,7 +326,7 @@ def compute_net_torque(
 
 
 def remove_net_torque(
-    g: dgl.DGLGraph,
+    g: "dgl.DGLGraph",
     forces: torch.Tensor,
     n_nodes: torch.Tensor,
 ) -> torch.Tensor:

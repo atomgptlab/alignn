@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """Module to train for a folder with formatted dataset."""
+
 import os
 import torch.distributed as dist
 import csv
@@ -13,6 +14,10 @@ from alignn.config import TrainingConfig
 from jarvis.db.jsonutils import loadjson
 import argparse
 from alignn.models.alignn_atomwise import ALIGNNAtomWise, ALIGNNAtomWiseConfig
+from alignn.models.alignn_atomwise_pure import (
+    ALIGNNAtomWisePure,
+    ALIGNNAtomWisePureConfig,
+)
 import torch
 import time
 from jarvis.core.atoms import Atoms
@@ -192,6 +197,12 @@ def train_for_folder(
         except Exception as exp:
             print("Check", exp)
 
+    if config.gpu_memory_fraction is not None and torch.cuda.is_available():
+        torch.cuda.set_per_process_memory_fraction(
+            float(config.gpu_memory_fraction),
+            rank if world_size > 1 else 0,
+        )
+
     # config.keep_data_order = keep_data_order
     if classification_threshold is not None:
         config.classification_threshold = float(classification_threshold)
@@ -336,15 +347,18 @@ def train_for_folder(
     if restart_model_path is not None:
         # Should be best_model.pt file
         print("Restarting the model training:", restart_model_path)
-        if config.model.name == "alignn_atomwise":
+        if "alignn_" in config.model.name:  # == "alignn_atomwise":
             rest_config = loadjson(
                 restart_model_path.replace("current_model.pt", "config.json")
                 # restart_model_path.replace("best_model.pt", "config.json")
             )
-
-            tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
+            try:
+                tmp = ALIGNNAtomWiseConfig(**rest_config["model"])
+                model = ALIGNNAtomWise(tmp)  # config.model)
+            except Exception:
+                tmp = ALIGNNAtomWisePureConfig(**rest_config["model"])
+                model = ALIGNNAtomWisePure(tmp)  # config.model)
             print("Rest config", tmp)
-            model = ALIGNNAtomWise(tmp)  # config.model)
             print("model", model)
             model.load_state_dict(
                 torch.load(restart_model_path, map_location=device)
@@ -397,6 +411,7 @@ def train_for_folder(
         cutoff=config.cutoff,
         cutoff_extra=config.cutoff_extra,
         max_neighbors=config.max_neighbors,
+        three_body_cutoff=config.three_body_cutoff,
         output_features=config.model.output_features,
         classification_threshold=config.classification_threshold,
         target_multiplication_factor=config.target_multiplication_factor,
@@ -404,6 +419,8 @@ def train_for_folder(
         keep_data_order=config.keep_data_order,
         output_dir=config.output_dir,
         use_lmdb=config.use_lmdb,
+        use_pure_torch=config.model.name == "alignn_atomwise_pure",
+        read_existing=config.read_existing,
         dtype=config.dtype,
     )
     # print("dataset", dataset[0])

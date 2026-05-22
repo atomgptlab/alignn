@@ -133,7 +133,7 @@ def run(args):
             timestep        {args.timestep}
             velocity        all create {args.temp} {args.seed} mom yes rot yes
             fix             nve all nve
-            fix             tfix all langevin {args.temp} {args.temp} 0.1 {args.seed}
+            fix             tfix all langevin {args.temp} {args.temp} 0.1 {args.seed}  # noqa: E501
             thermo          10
             thermo_style    custom step temp pe ke etotal press
             """
