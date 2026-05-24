@@ -410,7 +410,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         ff_model_filename="best_model.pt",
         ff_config_filename="config.json",
         ff_config=None,
-        stress_wt=0.05,
+        stress_wt=1.0,
         props=[
             "cbm",
             "vbm",
