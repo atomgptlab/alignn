@@ -22,25 +22,57 @@ from ase.io import write as ase_write
 from jarvis.core.atoms import Atoms
 from jarvis.db.figshare import get_jid_data
 
-# Reference: Python ASE calculator path
-from alignn.ff.ff import AlignnAtomwiseCalculator
-
-
 # eV/Å³ ↔ bar conversion (LAMMPS `metal` units pressure)
 EV_PER_A3_TO_BAR = 1.602176634e6
 
 
-def python_reference(atoms_jarvis, calc):
+def python_reference_ase(atoms_jarvis, model_dir):
+    """ASE-calculator reference (DGL graph). NOTE: the DGL neighbor graph
+    can differ from the pure-torch k-nearest graph that pair_alignn (and
+    the model's training) uses, so this is *not* the right baseline for a
+    pure-torch model — see python_reference_pure."""
+    from alignn.ff.ff import AlignnAtomwiseCalculator
+
     a = atoms_jarvis.ase_converter()
-    a.calc = calc
-    E_raw = a.get_potential_energy()
-    E = float(np.asarray(E_raw).reshape(-1)[0])        # calc may return shape-(1,)
-    F = np.asarray(a.get_forces())                     # eV/Å
-    S6 = np.asarray(a.get_stress(voigt=True)).reshape(-1)   # eV/Å³ (Voigt)
-    # Reorder ASE Voigt (xx,yy,zz,yz,xz,xy) -> plain 3x3
+    a.calc = AlignnAtomwiseCalculator(
+        path=model_dir, force_mult_batchsize=False
+    )
+    E = float(np.asarray(a.get_potential_energy()).reshape(-1)[0])
+    F = np.asarray(a.get_forces())                      # eV/Å
+    S6 = np.asarray(a.get_stress(voigt=True)).reshape(-1)   # eV/Å³ Voigt
     S = np.array([[S6[0], S6[5], S6[4]],
                   [S6[5], S6[1], S6[3]],
                   [S6[4], S6[3], S6[2]]])
+    return E, F, S
+
+
+def python_reference_pure(atoms_jarvis, model_dir, cutoff, max_neighbors):
+    """Pure-torch reference: same k-nearest graph + entry point
+    (forward_tensors_z) that pair_alignn calls and that the model was
+    trained with. This is the correct apples-to-apples baseline."""
+    import torch
+    from alignn.pretrained import load_pure_torch_model
+    from alignn.torch_graph_builder import torch_neighbor_list
+
+    model, cfg = load_pure_torch_model(model_dir, device="cpu")
+    af = cfg.get("atom_features", "cgcnn")
+    model.register_species_table(atom_features=af)
+
+    dt = torch.get_default_dtype()
+    pos = torch.tensor(
+        np.asarray(atoms_jarvis.cart_coords), dtype=dt
+    ).requires_grad_(True)
+    L = torch.tensor(np.asarray(atoms_jarvis.lattice_mat), dtype=dt)
+    Z = torch.tensor(np.asarray(atoms_jarvis.atomic_numbers), dtype=torch.long)
+    src, dst, shift, _ = torch_neighbor_list(
+        pos, L, cutoff=float(cutoff), max_neighbors=int(max_neighbors),
+        atoms=atoms_jarvis, use_matscipy_topology=True,
+    )
+    out = model.forward_tensors_z(pos, L, Z, src, dst, shift, True)
+    E = float(out["energy"].detach())
+    F = out["forces"].detach().cpu().numpy()
+    S = (out["stress"].detach().cpu().numpy()
+         if "stress" in out else np.zeros((3, 3)))
     return E, F, S
 
 
@@ -124,6 +156,12 @@ def main():
     ap.add_argument("--fail-energy", type=float, default=0.05,
                     help="eV/atom, gate: exit non-zero if |ΔE|/atom exceeds "
                          "this.")
+    ap.add_argument("--reference", choices=["pure", "ase"], default="pure",
+                    help="Python baseline. 'pure' (default) uses the same "
+                         "pure-torch k-nearest graph + forward_tensors_z that "
+                         "pair_alignn implements and the model was trained "
+                         "with. 'ase' uses AlignnAtomwiseCalculator (DGL "
+                         "graph) which can legitimately differ.")
     args = ap.parse_args()
     if args.cutoff is None or args.max_neighbors is None:
         import json as _j
@@ -155,9 +193,16 @@ def main():
     atoms_pert = ase2j(ase_atoms)
 
     # --- Python reference ---
-    print("\n→ Python reference (AlignnAtomwiseCalculator)...")
-    calc = AlignnAtomwiseCalculator(path=args.model_dir, force_mult_batchsize=False)
-    E_py, F_py, S_py = python_reference(atoms_pert, calc)
+    if args.reference == "pure":
+        print("\n→ Python reference (pure-torch: build_pure_torch_graph "
+              "+ forward_tensors_z)...")
+        E_py, F_py, S_py = python_reference_pure(
+            atoms_pert, args.model_dir, args.cutoff, args.max_neighbors
+        )
+    else:
+        print("\n→ Python reference (ASE AlignnAtomwiseCalculator, DGL graph)"
+              " — may differ from pair_alignn's pure-torch graph...")
+        E_py, F_py, S_py = python_reference_ase(atoms_pert, args.model_dir)
 
     # --- LAMMPS pair_alignn ---
     print("→ LAMMPS pair_alignn (run 0)...")
