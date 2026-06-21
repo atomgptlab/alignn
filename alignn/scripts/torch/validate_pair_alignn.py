@@ -16,7 +16,7 @@ Usage:
         --jid JVASP-1002 --supercell 2 2 2
 """
 from __future__ import annotations
-import argparse, os, tempfile
+import argparse, os, sys, tempfile
 import numpy as np
 from ase.io import write as ase_write
 from jarvis.core.atoms import Atoms
@@ -44,7 +44,8 @@ def python_reference(atoms_jarvis, calc):
     return E, F, S
 
 
-def lammps_pair_alignn(ase_atoms, ts_model_path, species_symbols, cutoff=5.0):
+def lammps_pair_alignn(ase_atoms, ts_model_path, species_symbols, cutoff=5.0,
+                       max_neighbors=12):
     """Run LAMMPS with pair_alignn at step 0, return E/F/S."""
     from lammps import lammps
 
@@ -61,7 +62,7 @@ def lammps_pair_alignn(ase_atoms, ts_model_path, species_symbols, cutoff=5.0):
         read_data       {data_path}
         {'mass ' + ' '.join(str(i+1)+' '+str(_atomic_mass(sym))
                              for i,sym in enumerate(species_symbols))}
-        pair_style      alignn {cutoff}
+        pair_style      alignn {cutoff} {max_neighbors}
         pair_coeff      * * {ts_model_path} {' '.join(species_symbols)}
         neighbor        2.0 bin
         neigh_modify    every 1 delay 0 check yes
@@ -115,11 +116,24 @@ def main():
                          "(so forces are non-zero and meaningful)")
     ap.add_argument("--cutoff", type=float, default=None,
                     help="Å, model cutoff (read from model-dir config if unset)")
+    ap.add_argument("--max-neighbors", type=int, default=None,
+                    help="k-nearest cap (read from model-dir config if unset). "
+                         "Must match pair_style alignn <cutoff> <max_neighbors>.")
+    ap.add_argument("--fail-force", type=float, default=0.05,
+                    help="eV/Å, gate: exit non-zero if max|ΔF| exceeds this.")
+    ap.add_argument("--fail-energy", type=float, default=0.05,
+                    help="eV/atom, gate: exit non-zero if |ΔE|/atom exceeds "
+                         "this.")
     args = ap.parse_args()
-    if args.cutoff is None:
+    if args.cutoff is None or args.max_neighbors is None:
         import json as _j
-        args.cutoff = float(_j.load(open(f"{args.model_dir}/config.json"))["cutoff"])
-        print(f"cutoff (from config): {args.cutoff} Å")
+        _cfg = _j.load(open(f"{args.model_dir}/config.json"))
+        if args.cutoff is None:
+            args.cutoff = float(_cfg["cutoff"])
+            print(f"cutoff (from config): {args.cutoff} Å")
+        if args.max_neighbors is None:
+            args.max_neighbors = int(_cfg.get("max_neighbors", 12))
+            print(f"max_neighbors (from config): {args.max_neighbors}")
 
     # Build system
     d = get_jid_data(jid=args.jid, dataset="dft_3d")
@@ -148,7 +162,8 @@ def main():
     # --- LAMMPS pair_alignn ---
     print("→ LAMMPS pair_alignn (run 0)...")
     E_lmp, F_lmp, S_lmp = lammps_pair_alignn(ase_atoms, args.ts_model, species,
-                                              cutoff=args.cutoff)
+                                              cutoff=args.cutoff,
+                                              max_neighbors=args.max_neighbors)
 
     # --- Compare ---
     dE = abs(E_lmp - E_py)
@@ -183,6 +198,27 @@ def main():
              E_py=E_py, F_py=F_py, S_py=S_py,
              E_lmp=E_lmp, F_lmp=F_lmp, S_lmp=S_lmp)
     print("\nsaved raw arrays -> validate_pair_alignn.npz")
+
+    # Gate decision: a *gross* mismatch means pair_alignn and the Python
+    # reference disagree, so any MD with this .pt is untrustworthy. We use a
+    # loose force threshold here (not the strict 1e-3 above) so float32
+    # round-off doesn't trip the gate — only real bugs do.
+    n_atoms = max(len(F_py), 1)
+    dE_per_atom = dE / n_atoms
+    gross = (max_abs_dF > args.fail_force) or (dE_per_atom > args.fail_energy)
+    print(
+        f"\nGATE: max|ΔF|={max_abs_dF:.3e} (limit {args.fail_force}) "
+        f"|ΔE|/atom={dE_per_atom:.3e} (limit {args.fail_energy}) "
+        f"-> {'FAIL' if gross else 'OK'}"
+    )
+    if gross:
+        print(
+            "pair_alignn disagrees with the Python reference. Do NOT run MD "
+            "until this is fixed (check the TorchScript export and the C++ "
+            "neighbor/graph construction)."
+        )
+        sys.exit(1)
+    sys.exit(0)
 
 
 if __name__ == "__main__":
