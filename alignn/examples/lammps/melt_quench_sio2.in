@@ -1,0 +1,57 @@
+# Melt-quench of α-quartz SiO2 using ALIGNN-FF (pure-torch `mps`) via
+# pair_alignn. Produces amorphous silica in `sio2_quenched.data`.
+# SiO2 melts at ~1973 K; we use 4000 K for fast diffusion.
+#
+# Schedule is short (~7 ps total) for a demo. Use a longer quench
+# (e.g. 50 ps) for production-quality amorphous silica.
+#
+# Run:  python build_sio2.py && lmp -in melt_quench_sio2.in
+
+units           metal
+atom_style      atomic
+boundary        p p p
+read_data       sio2.data
+
+# Type ids set by build_sio2.py (specorder=["Si","O"])
+mass            1 28.0855        # Si
+mass            2 15.9994        # O
+
+# Cutoff + max_neighbors must match the trained mps model.
+pair_style      alignn 5.0 12
+pair_coeff      * * alignn_ff.pt  Si O
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+timestep        0.0005           # 0.5 fs — lighter O atom needs smaller dt
+thermo          50
+thermo_style    custom step temp pe ke etotal press vol
+dump            traj all custom 500 sio2_melt_quench.lammpstrj id type x y z
+
+velocity        all create 300.0 54321 mom yes rot yes dist gaussian
+
+# Stage 1: equilibrate at 300 K (0.25 ps)
+fix             nvt1 all nvt temp 300.0 300.0 0.05
+run             500
+unfix           nvt1
+
+# Stage 2: heat 300 K -> 4000 K (1 ps)
+fix             nvt2 all nvt temp 300.0 4000.0 0.05
+run             2000
+unfix           nvt2
+
+# Stage 3: hold molten at 4000 K (1.5 ps)
+fix             nvt3 all nvt temp 4000.0 4000.0 0.05
+run             3000
+unfix           nvt3
+
+# Stage 4: quench 4000 K -> 300 K (3 ps, ~1.2 K/fs — fast for a demo)
+fix             nvt4 all nvt temp 4000.0 300.0 0.05
+run             6000
+unfix           nvt4
+
+# Stage 5: anneal at 300 K (1 ps)
+fix             nvt5 all nvt temp 300.0 300.0 0.05
+run             2000
+
+write_data      sio2_quenched.data

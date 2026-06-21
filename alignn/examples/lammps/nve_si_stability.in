@@ -1,0 +1,45 @@
+# NVE stability test for ALIGNN-FF (pure-torch `mps` model) on Si.
+# A well-trained model + correct cutoff should conserve etotal to
+# within a few meV/atom over several picoseconds.
+#
+# Run:  lmp -in nve_si_stability.in
+
+units           metal
+atom_style      atomic
+boundary        p p p
+read_data       si.data
+mass            1 28.0855
+
+# Native pair style: forces/stresses come from the TorchScripted ALIGNN-FF.
+# Cutoff + max_neighbors must match what the model was trained with
+# (mps model: cutoff=5.0 Å, max_neighbors=12).
+pair_style      alignn 5.0 12
+pair_coeff      * * alignn_ff.pt  Si
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# --- Relax cell + atoms first so we don't start at MBar-scale stress ---
+thermo          10
+thermo_style    custom step temp pe ke etotal press vol
+fix             relax all box/relax iso 0.0 vmax 0.001
+min_style       cg
+minimize        1.0e-6 1.0e-4 200 1000
+unfix           relax
+minimize        1.0e-6 1.0e-4 200 1000
+
+# --- Gentle thermalisation at 100 K ---
+timestep        0.0005           # 0.5 fs
+velocity        all create 100.0 12345 mom yes rot yes dist gaussian
+fix             eq all nvt temp 100.0 100.0 0.05
+thermo          50
+run             1000
+unfix           eq
+
+# --- NVE stability run: 2.5 ps. Watch etotal in the log. ---
+reset_timestep  0
+dump            traj all custom 200 nve_si.lammpstrj id type x y z
+fix             nve all nve
+run             5000
+
+write_data      si_nve_final.data
