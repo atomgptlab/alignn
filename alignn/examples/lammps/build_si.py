@@ -22,7 +22,10 @@ except ImportError:
 
 
 a = Atoms.from_dict(get_jid_data(jid="JVASP-1002", dataset="dft_3d")["atoms"])
-ase_atoms = a.make_supercell([3, 3, 3]).ase_converter()
+# JVASP-1002 is the 2-atom primitive FCC cell; a supercell of it is
+# triclinic. Use the conventional (cubic) cell so the box stays orthogonal
+# -> a 2x2x2 supercell is a clean 64-atom cubic system for the MD examples.
+ase_atoms = a.get_conventional_atoms.make_supercell([2, 2, 2]).ase_converter()
 print(f"initial: {len(ase_atoms)} atoms, V = {ase_atoms.get_volume():.2f} Å³")
 
 ase_atoms.calc = AlignnAtomwiseCalculator(path=default_path())

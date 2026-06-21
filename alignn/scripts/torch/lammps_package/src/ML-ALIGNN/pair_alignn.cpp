@@ -192,10 +192,17 @@ void PairAlignn::compute(int eflag, int vflag) {
         const double dox = x[j][0] - x[owner][0];
         const double doy = x[j][1] - x[owner][1];
         const double doz = x[j][2] - x[owner][2];
+        // Integer cell offset S with disp = S0*a1 + S1*a2 + S2*a3, where
+        // the lattice rows passed to the model are
+        //   a1=(hx,0,0), a2=(xy,hy,0), a3=(xz,yz,hz).
+        // Solve by back-substitution — correct for triclinic cells and
+        // reduces to diagonal rounding when xy=xz=yz=0. (The previous
+        // diagonal-only form gave wrong shifts for non-orthogonal boxes,
+        // e.g. a supercell of a primitive FCC cell, which blew up MD.)
         (void)triclinic;
-        shx = std::round(dox / hx);
-        shy = std::round(doy / hy);
         shz = std::round(doz / hz);
+        shy = std::round((doy - shz * yz) / hy);
+        shx = std::round((dox - shy * xy - shz * xz) / hx);
       }
       buf.push_back({r2, dst_local,
                      static_cast<float>(shx),
