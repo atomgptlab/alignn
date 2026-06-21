@@ -23,17 +23,15 @@ input contract; same TorchScript entry point.
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Dict, Literal, Optional
 
 import numpy as np
 import torch
 from torch import nn
 from torch.autograd import grad
-from torch.nn import functional as F
 
 from alignn.models.alignn_atomwise_pure import (
     ALIGNNConvPure,
-    EdgeGatedGraphConvPure,
     _bond_cosines,
     _make_bond_conv,
     scatter_mean,
@@ -112,7 +110,11 @@ class RadialBessel(nn.Module):
     def forward(self, dist: torch.Tensor) -> torch.Tensor:
         # dist: (E,)
         d = dist.unsqueeze(-1).clamp_min(1e-8)
-        out = self.norm_const * torch.sin(self.frequencies * d * self.inv_cutoff) / d
+        out = (
+            self.norm_const
+            * torch.sin(self.frequencies * d * self.inv_cutoff)
+            / d
+        )
         if self.smooth is not None:
             out = out * self.smooth(d)
         return out
@@ -231,8 +233,8 @@ class ALIGNNAtomWisePureSmooth(nn.Module):
 
     def __init__(
         self,
-        config: ALIGNNAtomWisePureSmoothConfig = ALIGNNAtomWisePureSmoothConfig(
-            name="alignn_atomwise_pure_smooth"
+        config: ALIGNNAtomWisePureSmoothConfig = (
+            ALIGNNAtomWisePureSmoothConfig(name="alignn_atomwise_pure_smooth")
         ),
     ):
         super().__init__()
@@ -272,7 +274,9 @@ class ALIGNNAtomWisePureSmooth(nn.Module):
             from alignn.models.utils import RBFExpansion
 
             self.radial = RBFExpansion(
-                vmin=0, vmax=config.radial_cutoff, bins=config.edge_input_features
+                vmin=0,
+                vmax=config.radial_cutoff,
+                bins=config.edge_input_features,
             )
             edge_in_dim = config.edge_input_features
             self._radial_kind = "gaussian"
@@ -588,7 +592,7 @@ class ALIGNNAtomWisePureSmooth(nn.Module):
         # --- energy readout ---
         if self.config.mlp_first:
             site_e = self.fc(x)                       # (N, output_features)
-            en_out = scatter_sum(site_e, node_bid, B) # (B, output_features)
+            en_out = scatter_sum(site_e, node_bid, B)  # (B, output_features)
             if self.config.output_features == 1:
                 en_out = en_out.squeeze(-1)
             out = en_out  # for link-fn / classification compatibility below

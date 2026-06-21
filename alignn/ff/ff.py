@@ -1203,7 +1203,7 @@ def phonons(
     phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
     phonon.generate_displacements(distance=distance)
     # print("Len dis", len(phonon.supercells_with_displacements))
-    # use the property (works on phonopy 2.10/2.48/4.x; get_* methods removed in 2.20+)
+    # property form; get_* methods were removed in phonopy 2.20+
     supercells = phonon.supercells_with_displacements
     # Force calculations by calculator
     set_of_forces = []
@@ -1211,7 +1211,7 @@ def phonons(
 
     for scell in supercells:
         ase_atoms = AseAtoms(
-            symbols=scell.symbols,                  # properties: phonopy 2.10/2.48/4.x
+            symbols=scell.symbols,  # property form (phonopy 2.10/2.48/4.x)
             scaled_positions=scell.scaled_positions,
             cell=scell.cell,
             pbc=True,
@@ -1362,7 +1362,7 @@ def phonons3(
     for ii, scell in enumerate(supercells):
         print("scell=", ii)
         ase_atoms = AseAtoms(
-            symbols=scell.symbols,                  # properties: phonopy 2.10/2.48/4.x
+            symbols=scell.symbols,  # property form (phonopy 2.10/2.48/4.x)
             scaled_positions=scell.scaled_positions,
             cell=scell.cell,
             pbc=True,
