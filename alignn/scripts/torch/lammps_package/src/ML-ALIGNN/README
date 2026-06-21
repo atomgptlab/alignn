@@ -1,0 +1,44 @@
+ML-ALIGNN package
+=================
+
+This package provides pair_style alignn, a native LAMMPS pair style that
+evaluates the ALIGNN-FF machine-learning interatomic potential by calling a
+TorchScript-exported model through the libtorch (PyTorch C++) API. Energies,
+forces and the virial stress are computed by the model at every MD step with no
+Python in the loop.
+
+The ALIGNN-FF model is described in:
+
+  K. Choudhary et al., "Unified graph neural network force-field for the
+  periodic table", Digital Discovery 2, 346 (2023).
+  https://doi.org/10.1039/D2DD00096B
+
+and the underlying ALIGNN architecture in:
+
+  K. Choudhary and B. DeCost, "Atomistic Line Graph Neural Network for improved
+  materials property predictions", npj Computational Materials 7, 185 (2021).
+  https://doi.org/10.1038/s41524-021-00650-1
+
+The package was contributed by the AtomGPT/JARVIS team
+(https://github.com/atomgptlab/alignn). Contact: Kamal Choudhary.
+
+Dependency
+----------
+
+This package requires libtorch (the PyTorch C++ distribution). The easiest way
+to satisfy it is to point CMake at the libtorch shipped inside a PyTorch
+install:
+
+  CMAKE_PREFIX_PATH=<...>/site-packages/torch/share/cmake
+
+See the documentation in doc/src/pair_alignn.rst and the build/run examples in
+examples/PACKAGES/alignn/ for details, and the upstream helper script
+alignn/scripts/torch/build_lammps_alignn.sh for a fully automated build.
+
+Files in this directory
+-----------------------
+
+  pair_alignn.cpp   pair style implementation
+  pair_alignn.h     pair style header
+  Install.sh        legacy make-build install script
+  README            this file
