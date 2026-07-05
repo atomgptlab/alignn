@@ -40,6 +40,6 @@ unfix           eq
 reset_timestep  0
 dump            traj all custom 200 nve_si.lammpstrj id type x y z
 fix             nve all nve
-run             5000
+run             2000
 
 write_data      si_nve_final.data
