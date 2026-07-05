@@ -235,6 +235,15 @@ parser.add_argument(
     + " construction.",
 )
 
+parser.add_argument(
+    "--pure_torch",
+    action="store_true",
+    help="Use the DGL-free pure-torch model path (ALIGNNAtomWisePure). "
+    "Model names come from all_models_alignn_atomwise.json, e.g. 'mps', "
+    "'formation_energy_peratom', 'mbj_bandgap'. Auto-enabled if DGL is "
+    "not installed.",
+)
+
 
 device = "cpu"
 if torch.cuda.is_available():
@@ -331,14 +340,155 @@ def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
     return model
 
 
+def _dgl_available():
+    """Return True if DGL can be imported."""
+    try:
+        import dgl  # noqa: F401
+
+        return True
+    except Exception:
+        return False
+
+
+def _atom_features_from_config(config):
+    """Best-effort atom_features string for the pure-torch graph builder."""
+    af = config.get("atom_features")
+    if af:
+        return af
+    n = config.get("model", {}).get("atom_input_features", 92)
+    return "atomic_number" if int(n) == 1 else "cgcnn"
+
+
+def load_pure_torch_model(model_dir, device="cpu"):
+    """Load a pure-torch ALIGNN model (+ config) from a directory.
+
+    The directory must contain ``config.json`` and ``best_model.pt``
+    (the layout produced by ``alignn.ff.ff.get_figshare_model_ff``).
+    """
+    config = loadjson(os.path.join(model_dir, "config.json"))
+    mcfg = dict(config["model"])
+    name = mcfg.get("name", "alignn_atomwise_pure")
+    state = torch.load(
+        os.path.join(model_dir, "best_model.pt"),
+        map_location=device,
+        weights_only=False,
+    )
+    if isinstance(state, dict) and "model" in state:
+        state = state["model"]
+    if name == "alignn_atomwise_pure_smooth":
+        from alignn.models.alignn_atomwise_pure_smooth import (
+            ALIGNNAtomWisePureSmooth,
+            ALIGNNAtomWisePureSmoothConfig,
+        )
+
+        model = ALIGNNAtomWisePureSmooth(
+            ALIGNNAtomWisePureSmoothConfig(**mcfg)
+        )
+    else:
+        from alignn.models.alignn_atomwise_pure import (
+            ALIGNNAtomWisePure,
+            ALIGNNAtomWisePureConfig,
+        )
+
+        mcfg["name"] = "alignn_atomwise_pure"
+        model = ALIGNNAtomWisePure(ALIGNNAtomWisePureConfig(**mcfg))
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    if missing or unexpected:
+        print(
+            f"[pure_torch] load_state_dict: missing={len(missing)} "
+            f"unexpected={len(unexpected)}"
+        )
+    model = model.to(device).eval()
+    return model, config
+
+
+def get_figshare_model_pure(model_name="mps", device="cpu"):
+    """Download a pure-torch ALIGNN model from figshare and load it.
+
+    ``model_name`` must be a key of
+    ``alignn/ff/all_models_alignn_atomwise.json`` (e.g. ``mps``,
+    ``formation_energy_peratom``, ``mbj_bandgap``, ``bulk_modulus_kv``).
+    """
+    from alignn.ff.ff import get_figshare_model_ff
+
+    model_dir = get_figshare_model_ff(model_name=model_name)
+    return load_pure_torch_model(model_dir, device=device)
+
+
+def get_prediction_pure(
+    model_name="mps",
+    atoms=None,
+    cutoff=None,
+    max_neighbors=None,
+    device="cpu",
+):
+    """Single-structure prediction using the DGL-free (pure-torch) path."""
+    from alignn.torch_graph_builder import build_pure_torch_graph
+
+    if os.path.isdir(model_name):
+        model, config = load_pure_torch_model(
+            model_dir=model_name, device=device
+        )
+    else:
+        model, config = get_figshare_model_pure(model_name, device=device)
+
+    # Prefer the model's training cutoff / max_neighbors (correct for an
+    # ML potential); fall back to the supplied values.
+    cut = float(config.get("cutoff", cutoff if cutoff is not None else 8.0))
+    mn = int(
+        config.get(
+            "max_neighbors", max_neighbors if max_neighbors is not None else 12
+        )
+    )
+    atom_features = _atom_features_from_config(config)
+    print(
+        f"[pure_torch] cutoff={cut} max_neighbors={mn} "
+        f"atom_features={atom_features}"
+    )
+    g, lg = build_pure_torch_graph(
+        atoms=atoms,
+        two_body_cutoff=cut,
+        max_neighbors=mn,
+        atom_features=atom_features,
+        compute_line_graph=True,
+        device=device,
+    )
+    lat = (
+        torch.tensor(atoms.lattice_mat)
+        .type(torch.get_default_dtype())
+        .to(device)
+    )
+    out = model([g, lg, lat])
+    out_data = out["out"] if isinstance(out, dict) else out
+    out_data = out_data.detach().cpu().numpy().flatten().tolist()
+    return out_data
+
+
 def get_prediction(
     model_name="jv_formation_energy_peratom_alignn",
     atoms=None,
     cutoff=8,
     max_neighbors=12,
+    pure_torch=False,
 ):
-    """Get model prediction on a single structure."""
+    """Get model prediction on a single structure.
+
+    If ``pure_torch`` is True, or if DGL is not installed, the DGL-free
+    ``ALIGNNAtomWisePure`` path is used (models from
+    ``all_models_alignn_atomwise.json``, e.g. ``mps``,
+    ``formation_energy_peratom``).
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if pure_torch or not _dgl_available():
+        if not pure_torch:
+            print("DGL not available; using pure-torch model path.")
+        return get_prediction_pure(
+            model_name=model_name,
+            atoms=atoms,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
+            device=device,
+        )
     if os.path.isdir(model_name):
 
         # import torch
@@ -510,6 +660,7 @@ if __name__ == "__main__":
         cutoff=float(cutoff),
         max_neighbors=int(max_neighbors),
         atoms=atoms,
+        pure_torch=args.pure_torch,
     )
 
     print("Predicted value:", model_name, file_path, out_data)

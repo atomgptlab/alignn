@@ -1203,16 +1203,17 @@ def phonons(
     phonon = Phonopy(bulk, [[dim[0], 0, 0], [0, dim[1], 0], [0, 0, dim[2]]])
     phonon.generate_displacements(distance=distance)
     # print("Len dis", len(phonon.supercells_with_displacements))
-    supercells = phonon.get_supercells_with_displacements()
+    # property form; get_* methods were removed in phonopy 2.20+
+    supercells = phonon.supercells_with_displacements
     # Force calculations by calculator
     set_of_forces = []
     disp = 0
 
     for scell in supercells:
         ase_atoms = AseAtoms(
-            symbols=scell.get_chemical_symbols(),
-            scaled_positions=scell.get_scaled_positions(),
-            cell=scell.get_cell(),
+            symbols=scell.symbols,  # property form (phonopy 2.10/2.48/4.x)
+            scaled_positions=scell.scaled_positions,
+            cell=scell.cell,
             pbc=True,
         )
         ase_atoms.calc = calc
@@ -1227,7 +1228,7 @@ def phonons(
     phonon.produce_force_constants(forces=set_of_forces)
     if write_fc:
         write_FORCE_CONSTANTS(
-            phonon.get_force_constants(), filename="FORCE_CONSTANTS"
+            phonon.force_constants, filename="FORCE_CONSTANTS"
         )
 
     lbls = kpoints.labels
@@ -1286,7 +1287,11 @@ def phonons(
     tdos = phonon._total_dos
 
     # print('tods',tdos._frequencies.shape)
-    freqs, ds = tdos.get_dos()
+    # phonopy >=2.20 removed TotalDos.get_dos(); use properties with fallback
+    if hasattr(tdos, "frequency_points"):
+        freqs, ds = tdos.frequency_points, tdos.dos
+    else:
+        freqs, ds = tdos.get_dos()
     freqs = np.array(freqs)
     freqs = freqs * freq_conversion_factor
     min_freq = min_freq_tol * freq_conversion_factor
@@ -1357,9 +1362,9 @@ def phonons3(
     for ii, scell in enumerate(supercells):
         print("scell=", ii)
         ase_atoms = AseAtoms(
-            symbols=scell.get_chemical_symbols(),
-            scaled_positions=scell.get_scaled_positions(),
-            cell=scell.get_cell(),
+            symbols=scell.symbols,  # property form (phonopy 2.10/2.48/4.x)
+            scaled_positions=scell.scaled_positions,
+            cell=scell.cell,
             pbc=True,
         )
         ase_atoms.calc = calc

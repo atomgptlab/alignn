@@ -1,0 +1,53 @@
+# NVE stability test for the ML-ALIGNN pair style on crystalline Si.
+#
+# A well-trained ALIGNN-FF model evaluated with the correct cutoff conserves
+# total energy to within a few meV/atom over several picoseconds.
+#
+# Before running:
+#   1. Build LAMMPS with the ML-ALIGNN package (requires libtorch).
+#   2. Download + TorchScript-export the default mps model to alignn_ff.pt
+#      and build the relaxed si.data structure. The helper scripts in the
+#      ALIGNN repo do both:
+#        python get_model.py    # writes alignn_ff.pt
+#        python build_si.py     # writes si.data
+#
+# Run:
+#   lmp -in in.alignn.si
+
+units           metal
+atom_style      atomic
+boundary        p p p
+read_data       si.data
+mass            1 28.0855
+
+# cutoff (5.0 Ang) and max_neighbors (12) MUST match the model's config.json.
+pair_style      alignn 5.0 12
+pair_coeff      * * alignn_ff.pt  Si
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# Relax cell + atoms first so we don't start at large residual stress.
+thermo          10
+thermo_style    custom step temp pe ke etotal press vol
+fix             relax all box/relax iso 0.0 vmax 0.001
+min_style       cg
+minimize        1.0e-6 1.0e-4 200 1000
+unfix           relax
+minimize        1.0e-6 1.0e-4 200 1000
+
+# Gentle thermalisation at 100 K.
+timestep        0.0005
+velocity        all create 100.0 12345 mom yes rot yes dist gaussian
+fix             eq all nvt temp 100.0 100.0 0.05
+thermo          50
+run             1000
+unfix           eq
+
+# NVE production run: watch etotal in the log.
+reset_timestep  0
+dump            traj all custom 200 si.lammpstrj id type x y z
+fix             nve all nve
+run             5000
+
+write_data      si_nve_final.data

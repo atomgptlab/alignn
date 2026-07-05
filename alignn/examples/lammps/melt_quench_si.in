@@ -1,0 +1,49 @@
+# Melt-quench of crystalline Si using ALIGNN-FF (pure-torch) via pair_alignn.
+# Produces amorphous Si in `si_quenched.data`.
+#
+# Run:  python build_si.py && lmp -in melt_quench_si.in
+
+units           metal
+atom_style      atomic
+boundary        p p p
+read_data       si.data
+mass            1 28.0855
+
+pair_style      alignn 5.0 12
+pair_coeff      * * alignn_ff.pt  Si
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+timestep        0.001            # 1 fs
+thermo          50
+thermo_style    custom step temp pe ke etotal press vol
+dump            traj all custom 200 si_melt_quench.lammpstrj id type x y z
+
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+
+# Stage 1: equilibrate at 300 K (0.2 ps)
+fix             nvt1 all nvt temp 300.0 300.0 0.1
+run             200
+unfix           nvt1
+
+# Stage 2: heat 300 K -> 3500 K (1 ps)
+fix             nvt2 all nvt temp 300.0 3500.0 0.1
+run             1000
+unfix           nvt2
+
+# Stage 3: hold molten at 3500 K (2 ps)
+fix             nvt3 all nvt temp 3500.0 3500.0 0.1
+run             2000
+unfix           nvt3
+
+# Stage 4: quench 3500 K -> 300 K (4 ps, ~0.8 K/fs)
+fix             nvt4 all nvt temp 3500.0 300.0 0.1
+run             4000
+unfix           nvt4
+
+# Stage 5: anneal at 300 K (2 ps)
+fix             nvt5 all nvt temp 300.0 300.0 0.1
+run             2000
+
+write_data      si_quenched.data

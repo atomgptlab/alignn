@@ -1,0 +1,36 @@
+ML-ALIGNN example: NVE stability of crystalline Si
+==================================================
+
+This example runs an NVE molecular-dynamics stability test on a Si supercell
+using `pair_style alignn` with the default Materials-Project (`mps`) ALIGNN-FF
+force field.
+
+Files
+-----
+
+  in.alignn.si   LAMMPS input script
+
+Two input files must be generated before running (they are not checked in
+because the model is downloaded from figshare and the structure is relaxed by
+the model itself):
+
+  alignn_ff.pt   TorchScript-exported ALIGNN-FF model
+  si.data        relaxed Si supercell in lammps-data format
+
+Both are produced by helper scripts in the ALIGNN repository
+(alignn/examples/lammps/):
+
+  python get_model.py    # downloads the mps model, writes alignn_ff.pt
+  python build_si.py     # relaxes a 3x3x3 Si supercell, writes si.data
+
+Then run:
+
+  lmp -in in.alignn.si
+
+Open log.lammps and inspect the `etotal` column over the NVE production run; a
+well-behaved model conserves total energy to within a few meV/atom. The run
+also writes a trajectory (si.lammpstrj) viewable in OVITO.
+
+Note: pair_style alignn requires the cutoff and max_neighbors arguments to
+match the model's training configuration (top-level `cutoff` and
+`max_neighbors` in config.json). For the mps model these are 5.0 and 12.

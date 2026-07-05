@@ -16,35 +16,68 @@ Usage:
         --jid JVASP-1002 --supercell 2 2 2
 """
 from __future__ import annotations
-import argparse, os, tempfile
+import argparse, os, sys, tempfile
 import numpy as np
 from ase.io import write as ase_write
 from jarvis.core.atoms import Atoms
 from jarvis.db.figshare import get_jid_data
 
-# Reference: Python ASE calculator path
-from alignn.ff.ff import AlignnAtomwiseCalculator
-
-
 # eV/Å³ ↔ bar conversion (LAMMPS `metal` units pressure)
 EV_PER_A3_TO_BAR = 1.602176634e6
 
 
-def python_reference(atoms_jarvis, calc):
+def python_reference_ase(atoms_jarvis, model_dir):
+    """ASE-calculator reference (DGL graph). NOTE: the DGL neighbor graph
+    can differ from the pure-torch k-nearest graph that pair_alignn (and
+    the model's training) uses, so this is *not* the right baseline for a
+    pure-torch model — see python_reference_pure."""
+    from alignn.ff.ff import AlignnAtomwiseCalculator
+
     a = atoms_jarvis.ase_converter()
-    a.calc = calc
-    E_raw = a.get_potential_energy()
-    E = float(np.asarray(E_raw).reshape(-1)[0])        # calc may return shape-(1,)
-    F = np.asarray(a.get_forces())                     # eV/Å
-    S6 = np.asarray(a.get_stress(voigt=True)).reshape(-1)   # eV/Å³ (Voigt)
-    # Reorder ASE Voigt (xx,yy,zz,yz,xz,xy) -> plain 3x3
+    a.calc = AlignnAtomwiseCalculator(
+        path=model_dir, force_mult_batchsize=False
+    )
+    E = float(np.asarray(a.get_potential_energy()).reshape(-1)[0])
+    F = np.asarray(a.get_forces())                      # eV/Å
+    S6 = np.asarray(a.get_stress(voigt=True)).reshape(-1)   # eV/Å³ Voigt
     S = np.array([[S6[0], S6[5], S6[4]],
                   [S6[5], S6[1], S6[3]],
                   [S6[4], S6[3], S6[2]]])
     return E, F, S
 
 
-def lammps_pair_alignn(ase_atoms, ts_model_path, species_symbols, cutoff=5.0):
+def python_reference_pure(atoms_jarvis, model_dir, cutoff, max_neighbors):
+    """Pure-torch reference: same k-nearest graph + entry point
+    (forward_tensors_z) that pair_alignn calls and that the model was
+    trained with. This is the correct apples-to-apples baseline."""
+    import torch
+    from alignn.pretrained import load_pure_torch_model
+    from alignn.torch_graph_builder import torch_neighbor_list
+
+    model, cfg = load_pure_torch_model(model_dir, device="cpu")
+    af = cfg.get("atom_features", "cgcnn")
+    model.register_species_table(atom_features=af)
+
+    dt = torch.get_default_dtype()
+    pos = torch.tensor(
+        np.asarray(atoms_jarvis.cart_coords), dtype=dt
+    ).requires_grad_(True)
+    L = torch.tensor(np.asarray(atoms_jarvis.lattice_mat), dtype=dt)
+    Z = torch.tensor(np.asarray(atoms_jarvis.atomic_numbers), dtype=torch.long)
+    src, dst, shift, _ = torch_neighbor_list(
+        pos, L, cutoff=float(cutoff), max_neighbors=int(max_neighbors),
+        atoms=atoms_jarvis, use_matscipy_topology=True,
+    )
+    out = model.forward_tensors_z(pos, L, Z, src, dst, shift, True)
+    E = float(out["energy"].detach())
+    F = out["forces"].detach().cpu().numpy()
+    S = (out["stress"].detach().cpu().numpy()
+         if "stress" in out else np.zeros((3, 3)))
+    return E, F, S
+
+
+def lammps_pair_alignn(ase_atoms, ts_model_path, species_symbols, cutoff=5.0,
+                       max_neighbors=12):
     """Run LAMMPS with pair_alignn at step 0, return E/F/S."""
     from lammps import lammps
 
@@ -61,7 +94,7 @@ def lammps_pair_alignn(ase_atoms, ts_model_path, species_symbols, cutoff=5.0):
         read_data       {data_path}
         {'mass ' + ' '.join(str(i+1)+' '+str(_atomic_mass(sym))
                              for i,sym in enumerate(species_symbols))}
-        pair_style      alignn {cutoff}
+        pair_style      alignn {cutoff} {max_neighbors}
         pair_coeff      * * {ts_model_path} {' '.join(species_symbols)}
         neighbor        2.0 bin
         neigh_modify    every 1 delay 0 check yes
@@ -115,11 +148,30 @@ def main():
                          "(so forces are non-zero and meaningful)")
     ap.add_argument("--cutoff", type=float, default=None,
                     help="Å, model cutoff (read from model-dir config if unset)")
+    ap.add_argument("--max-neighbors", type=int, default=None,
+                    help="k-nearest cap (read from model-dir config if unset). "
+                         "Must match pair_style alignn <cutoff> <max_neighbors>.")
+    ap.add_argument("--fail-force", type=float, default=0.05,
+                    help="eV/Å, gate: exit non-zero if max|ΔF| exceeds this.")
+    ap.add_argument("--fail-energy", type=float, default=0.05,
+                    help="eV/atom, gate: exit non-zero if |ΔE|/atom exceeds "
+                         "this.")
+    ap.add_argument("--reference", choices=["pure", "ase"], default="pure",
+                    help="Python baseline. 'pure' (default) uses the same "
+                         "pure-torch k-nearest graph + forward_tensors_z that "
+                         "pair_alignn implements and the model was trained "
+                         "with. 'ase' uses AlignnAtomwiseCalculator (DGL "
+                         "graph) which can legitimately differ.")
     args = ap.parse_args()
-    if args.cutoff is None:
+    if args.cutoff is None or args.max_neighbors is None:
         import json as _j
-        args.cutoff = float(_j.load(open(f"{args.model_dir}/config.json"))["cutoff"])
-        print(f"cutoff (from config): {args.cutoff} Å")
+        _cfg = _j.load(open(f"{args.model_dir}/config.json"))
+        if args.cutoff is None:
+            args.cutoff = float(_cfg["cutoff"])
+            print(f"cutoff (from config): {args.cutoff} Å")
+        if args.max_neighbors is None:
+            args.max_neighbors = int(_cfg.get("max_neighbors", 12))
+            print(f"max_neighbors (from config): {args.max_neighbors}")
 
     # Build system
     d = get_jid_data(jid=args.jid, dataset="dft_3d")
@@ -141,14 +193,22 @@ def main():
     atoms_pert = ase2j(ase_atoms)
 
     # --- Python reference ---
-    print("\n→ Python reference (AlignnAtomwiseCalculator)...")
-    calc = AlignnAtomwiseCalculator(path=args.model_dir, force_mult_batchsize=False)
-    E_py, F_py, S_py = python_reference(atoms_pert, calc)
+    if args.reference == "pure":
+        print("\n→ Python reference (pure-torch: build_pure_torch_graph "
+              "+ forward_tensors_z)...")
+        E_py, F_py, S_py = python_reference_pure(
+            atoms_pert, args.model_dir, args.cutoff, args.max_neighbors
+        )
+    else:
+        print("\n→ Python reference (ASE AlignnAtomwiseCalculator, DGL graph)"
+              " — may differ from pair_alignn's pure-torch graph...")
+        E_py, F_py, S_py = python_reference_ase(atoms_pert, args.model_dir)
 
     # --- LAMMPS pair_alignn ---
     print("→ LAMMPS pair_alignn (run 0)...")
     E_lmp, F_lmp, S_lmp = lammps_pair_alignn(ase_atoms, args.ts_model, species,
-                                              cutoff=args.cutoff)
+                                              cutoff=args.cutoff,
+                                              max_neighbors=args.max_neighbors)
 
     # --- Compare ---
     dE = abs(E_lmp - E_py)
@@ -183,6 +243,27 @@ def main():
              E_py=E_py, F_py=F_py, S_py=S_py,
              E_lmp=E_lmp, F_lmp=F_lmp, S_lmp=S_lmp)
     print("\nsaved raw arrays -> validate_pair_alignn.npz")
+
+    # Gate decision: a *gross* mismatch means pair_alignn and the Python
+    # reference disagree, so any MD with this .pt is untrustworthy. We use a
+    # loose force threshold here (not the strict 1e-3 above) so float32
+    # round-off doesn't trip the gate — only real bugs do.
+    n_atoms = max(len(F_py), 1)
+    dE_per_atom = dE / n_atoms
+    gross = (max_abs_dF > args.fail_force) or (dE_per_atom > args.fail_energy)
+    print(
+        f"\nGATE: max|ΔF|={max_abs_dF:.3e} (limit {args.fail_force}) "
+        f"|ΔE|/atom={dE_per_atom:.3e} (limit {args.fail_energy}) "
+        f"-> {'FAIL' if gross else 'OK'}"
+    )
+    if gross:
+        print(
+            "pair_alignn disagrees with the Python reference. Do NOT run MD "
+            "until this is fixed (check the TorchScript export and the C++ "
+            "neighbor/graph construction)."
+        )
+        sys.exit(1)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

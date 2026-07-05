@@ -8,6 +8,9 @@ from alignn.utils import BaseSettings
 from alignn.models.alignn import ALIGNNConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWiseConfig
 from alignn.models.alignn_atomwise_pure import ALIGNNAtomWisePureConfig
+from alignn.models.alignn_atomwise_pure_smooth import (
+    ALIGNNAtomWisePureSmoothConfig,
+)
 from alignn.models.ealignn_atomwise import eALIGNNAtomWiseConfig
 
 # import torch
@@ -235,5 +238,6 @@ class TrainingConfig(BaseSettings):
         ALIGNNConfig,
         ALIGNNAtomWiseConfig,
         ALIGNNAtomWisePureConfig,
+        ALIGNNAtomWisePureSmoothConfig,
         eALIGNNAtomWiseConfig,
     ] = ALIGNNAtomWiseConfig(name="alignn_atomwise")

@@ -14,6 +14,9 @@ from alignn.data import get_train_val_loaders
 from alignn.config import TrainingConfig
 from alignn.models.alignn_atomwise import ALIGNNAtomWise
 from alignn.models.alignn_atomwise_pure import ALIGNNAtomWisePure
+from alignn.models.alignn_atomwise_pure_smooth import (
+    ALIGNNAtomWisePureSmooth,
+)
 from alignn.torch_graph_builder import unbatch as _graph_unbatch
 from alignn.models.ealignn_atomwise import eALIGNNAtomWise
 from alignn.models.alignn import ALIGNN
@@ -162,6 +165,7 @@ def train_dgl(
     _model = {
         "alignn_atomwise": ALIGNNAtomWise,
         "alignn_atomwise_pure": ALIGNNAtomWisePure,
+        "alignn_atomwise_pure_smooth": ALIGNNAtomWisePureSmooth,
         "ealignn_atomwise": eALIGNNAtomWise,
         "alignn": ALIGNN,
     }

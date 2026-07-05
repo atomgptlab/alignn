@@ -194,9 +194,9 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         output_dir=None,
         batch_stress=True,
         force_mult_natoms=False,
-        force_mult_batchsize=True,
+        force_mult_batchsize=False,
         force_multiplier=1,
-        stress_wt=0.05,
+        stress_wt=1.00,
     ):
         """Initialize class."""
         super(AlignnAtomwiseCalculator, self).__init__(
@@ -410,7 +410,7 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         ff_model_filename="best_model.pt",
         ff_config_filename="config.json",
         ff_config=None,
-        stress_wt=0.05,
+        stress_wt=1.0,
         props=[
             "cbm",
             "vbm",
