@@ -456,6 +456,7 @@ def get_train_val_loaders(
                 cutoff=cutoff,
                 cutoff_extra=cutoff_extra,
                 max_neighbors=max_neighbors,
+                three_body_cutoff=three_body_cutoff,
                 classification=classification_threshold is not None,
                 output_dir=output_dir,
                 tmp_name=tmp_name,

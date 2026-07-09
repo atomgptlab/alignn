@@ -303,6 +303,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             max_neighbors=self.config["max_neighbors"],
             atom_features=self.config["atom_features"],
             use_canonize=self.config["use_canonize"],
+            three_body_cutoff=self.config.get("three_body_cutoff", None),
         )
         # print("self.devicee", self.device)
         # print("g", g.device)
