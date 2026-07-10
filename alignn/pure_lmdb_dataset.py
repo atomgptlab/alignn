@@ -125,14 +125,18 @@ class PureTorchLMDBDataset(Dataset):
 def _attach_node_payload(
     g: TorchGraph, key: str, value: np.ndarray, natoms: int
 ):
-    """Tile a per-structure tensor across nodes, like the DGL loader."""
+    """Tile a per-structure (global) tensor across nodes, like the DGL loader.
+
+    All callers pass a per-structure quantity (stress 3x3, extra_features,
+    additional_output) that must be broadcast to every node; genuine per-node
+    arrays (forces, atomwise targets) are assigned to ``g.ndata`` directly.
+    We therefore always tile. A previous ``shape[0] == natoms`` early-return
+    mis-fired for a 3x3 stress on a 3-atom cell (3 == 3), storing it as a
+    2-D per-node array and crashing batch collation (``got 2 and 3``) once
+    the batch mixed 3-atom and non-3-atom structures.
+    """
     dtype = torch.get_default_dtype()
     arr = np.asarray(value)
-    # Per-node array already: first dim matches num nodes.
-    if arr.ndim >= 1 and arr.shape[0] == natoms:
-        g.ndata[key] = torch.as_tensor(arr, dtype=dtype)
-        return
-    # Otherwise, broadcast / tile across nodes.
     tiled = np.broadcast_to(arr, (natoms,) + arr.shape).copy()
     g.ndata[key] = torch.as_tensor(tiled, dtype=dtype)
 
