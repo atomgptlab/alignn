@@ -28,11 +28,11 @@ config = {
     "n_test": 4,
     "n_val": 4,
     "atom_features": "cgcnn",
-    "neighbor_strategy": "k-nearest",
+    "neighbor_strategy": "pure_torch",
     "epochs": 2,
     "batch_size": 2,
     "model": {
-        "name": "alignn_atomwise",
+        "name": "alignn_atomwise_pure",
         "calculate_gradient": False,
         "energy_mult_natoms": False,
         "atom_input_features": 92,

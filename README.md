@@ -32,6 +32,15 @@ See [docs/index.md](docs/index.md) for the full introduction.
 
 ![ALIGNN layer schematic](https://github.com/atomgptlab/alignn/blob/develop/alignn/tex/schematic_lg.jpg)
 
+> ⚡ **Pure PyTorch — DGL is no longer required.** ALIGNN now runs fully in
+> native PyTorch. Neighbor lists, line graphs, and batched readout are all
+> built with plain torch tensor/scatter ops via
+> [`alignn/torch_graph_builder.py`](alignn/torch_graph_builder.py), so you can
+> train and run inference without installing DGL. To use the pure path, set the
+> model name to the `*_pure` variant (e.g. `alignn_atomwise_pure`) and
+> `neighbor_strategy` to `"pure_torch"` in your config. The example configs and
+> tests in this repository already default to this pure-PyTorch path.
+
 <a name="install"></a>
 ## Installation
 
