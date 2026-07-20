@@ -69,10 +69,27 @@ class PureTorchLMDBDataset(Dataset):
         self.lmdb_path = lmdb_path
         self.ids = ids or []
         self.line_graph = line_graph
-        self.env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
-        with self.env.begin() as txn:
+        # Open lazily: an lmdb.Environment cannot be pickled, so holding one
+        # here breaks DataLoader(num_workers>0), which pickles the dataset to
+        # each worker. Each process opens its own handle on first access.
+        self.env = None
+        _env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
+        with _env.begin() as txn:
             self.length = txn.stat()["entries"]
+        _env.close()
         self.prepare_batch = prepare_pure_batch
+
+    def _get_env(self):
+        """Return this process's LMDB handle, opening it on first use."""
+        if self.env is None:
+            self.env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
+        return self.env
+
+    def __getstate__(self):
+        """Drop the unpicklable LMDB handle when sent to a worker."""
+        state = self.__dict__.copy()
+        state["env"] = None
+        return state
 
     def __len__(self):
         """Return the number of records in the LMDB."""
@@ -80,7 +97,7 @@ class PureTorchLMDBDataset(Dataset):
 
     def __getitem__(self, idx):
         """Load and unpickle the ``idx``-th record."""
-        with self.env.begin() as txn:
+        with self._get_env().begin() as txn:
             serialized = txn.get(f"{idx}".encode())
         if self.line_graph:
             g, lg, lattice, label = pk.loads(serialized)

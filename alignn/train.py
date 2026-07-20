@@ -615,6 +615,11 @@ def train_dgl(
                 )
 
         if rank == 0 or world_size == 1:
+            # This block runs on rank 0 only. Forward through the underlying
+            # module, not the DDP wrapper: a DDP forward performs collectives
+            # (buffer broadcast) that the other ranks never reach here, which
+            # deadlocks rank 0 until the NCCL watchdog times out.
+            eval_net = _unwrap(net)
             test_loss = 0
             test_result = []
             for dats, jid in zip(test_loader, test_loader.dataset.ids):
@@ -622,7 +627,7 @@ def train_dgl(
                 info["id"] = jid
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
-                    result = net(
+                    result = eval_net(
                         [
                             dats[0].to(device),
                             dats[1].to(device),
@@ -630,7 +635,9 @@ def train_dgl(
                         ]
                     )
                 else:
-                    result = net([dats[0].to(device), dats[1].to(device)])
+                    result = eval_net(
+                        [dats[0].to(device), dats[1].to(device)]
+                    )
                 loss1 = 0
                 loss2 = 0
                 loss3 = 0
