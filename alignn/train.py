@@ -243,7 +243,9 @@ def train_dgl(
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=config.learning_rate,
-            epochs=config.epochs,
+            # Schedule spans the whole run; lr_total_epochs lets a resumed
+            # chain keep one continuous cycle (falls back to epochs).
+            epochs=(config.lr_total_epochs or config.epochs),
             steps_per_epoch=steps_per_epoch,
             pct_start=0.3,
         )
@@ -264,7 +266,26 @@ def train_dgl(
         # NOTE: optimizer / scheduler intentionally NOT recreated here.
         history_train = []
         history_val = []
-        for e in range(config.epochs):
+        # Resume optimizer/scheduler/epoch (weights are restored separately
+        # via --restart_model_path). current_state.pt is written each epoch
+        # below, alongside the pure-weights current_model.pt.
+        start_epoch = 0
+        if config.resume_checkpoint:
+            state_path = os.path.join(config.output_dir, "current_state.pt")
+            if os.path.exists(state_path):
+                ckpt = torch.load(state_path, map_location=device)
+                optimizer.load_state_dict(ckpt["optimizer"])
+                scheduler.load_state_dict(ckpt["scheduler"])
+                best_loss = ckpt.get("best_loss", best_loss)
+                start_epoch = ckpt["epoch"]
+                if rank == 0:
+                    print(
+                        "Resuming from epoch",
+                        start_epoch,
+                        "best_loss",
+                        best_loss,
+                    )
+        for e in range(start_epoch, config.epochs):
             train_init_time = time.time()
             running_loss = 0
             running_loss1 = 0
@@ -553,6 +574,17 @@ def train_dgl(
                 torch.save(
                     _unwrap(net).state_dict(),
                     os.path.join(config.output_dir, current_model_name),
+                )
+                # Resume state (optimizer/scheduler/next-epoch/best_loss),
+                # kept separate so current_model.pt stays a pure state_dict.
+                torch.save(
+                    {
+                        "epoch": e + 1,
+                        "optimizer": optimizer.state_dict(),
+                        "scheduler": scheduler.state_dict(),
+                        "best_loss": best_loss,
+                    },
+                    os.path.join(config.output_dir, "current_state.pt"),
                 )
             saving_msg = ""
             if val_loss < best_loss:
