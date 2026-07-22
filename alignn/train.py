@@ -158,7 +158,11 @@ def train_dgl(
         test_loader = train_val_test_loaders[2]
         prepare_batch = train_val_test_loaders[3]
     if use_ddp:
-        device = torch.device(f"cuda:{rank}")
+        # `rank` is GLOBAL: on a multi-node launch it exceeds the per-node
+        # device count (and with --gpu-bind=closest each rank sees a single
+        # GPU), so cuda:{rank} raises "invalid device ordinal". setup() has
+        # already selected this process's device -- read it back.
+        device = torch.device(f"cuda:{torch.cuda.current_device()}")
     prepare_batch = partial(prepare_batch, device=device)
     if classification:
         config.model.classification = True
@@ -216,7 +220,8 @@ def train_dgl(
     if use_ddp:
         net = DDP(
             net,
-            device_ids=[rank],
+            # local device index, not the global rank (see `device` above)
+            device_ids=[torch.cuda.current_device()],
             find_unused_parameters=bool(
                 getattr(config, "ddp_find_unused_parameters", False)
             ),

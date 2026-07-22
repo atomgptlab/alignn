@@ -3,6 +3,7 @@
 """Module to train for a folder with formatted dataset."""
 
 import os
+import subprocess
 import torch.distributed as dist
 import csv
 import sys
@@ -29,18 +30,55 @@ if torch.cuda.is_available():
     device = torch.device("cuda")
 
 
+def _local_rank(rank):
+    """GPU index on THIS node.
+
+    Under a multi-node launch the global rank exceeds the per-node device
+    count, so it cannot be used to select a device. Slurm exports
+    SLURM_LOCALID; fall back to the single-node case where global == local.
+    """
+    n = torch.cuda.device_count() or 1
+    # SLURM_LOCALID is only meaningful when there is one process per task
+    # (the multi-node launch). Under mp.spawn there is a single srun task
+    # with LOCALID=0 but 8 processes, so `rank` is the local index and
+    # trusting LOCALID would put every rank on GPU 0.
+    if int(os.environ.get("SLURM_NTASKS", "1")) > 1:
+        return int(os.environ.get("SLURM_LOCALID", 0)) % n
+    return rank % n
+
+
+def _master_addr():
+    """Hostname of the coordinating rank.
+
+    Single node -> localhost (unchanged behaviour). Multi-node -> first host
+    of the allocation, which every rank resolves identically.
+    """
+    nodelist = os.environ.get("SLURM_NODELIST", "")
+    if int(os.environ.get("SLURM_NNODES", "1")) <= 1 or not nodelist:
+        return "localhost"
+    try:  # expand e.g. "frontier[01-04]" -> first hostname
+        out = subprocess.run(
+            ["scontrol", "show", "hostnames", nodelist],
+            capture_output=True, text=True, check=True,
+        )
+        return out.stdout.split()[0]
+    except Exception:
+        return nodelist.split(",")[0]
+
+
 def setup(rank=0, world_size=0, port="12356"):
     """Set up multi GPU rank."""
     # "12356"
     if port == "":
         port = str(random.randint(10000, 99999))
     if world_size > 1:
-        os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = port
-        # os.environ["MASTER_PORT"] = "12355"
+        os.environ.setdefault("MASTER_ADDR", _master_addr())
+        os.environ.setdefault("MASTER_PORT", port)
         # Initialize the distributed environment.
         dist.init_process_group("nccl", rank=rank, world_size=world_size)
-        torch.cuda.set_device(rank)
+        # Device is selected by LOCAL rank: global rank >= 8 would index a
+        # GPU that does not exist on this node.
+        torch.cuda.set_device(_local_rank(rank))
 
 
 def cleanup(world_size):
@@ -449,6 +487,43 @@ def train_for_folder(
 
 if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
+    # Multi-node: one process per GCD, launched by srun/torchrun, so ranks
+    # come from the environment instead of mp.spawn (which cannot cross
+    # nodes). Requires SLURM_NTASKS > 1, i.e. `srun -n <total_gcds>`;
+    # a single-task launch falls through to the unchanged path below.
+    _ntasks = int(os.environ.get("SLURM_NTASKS", "1"))
+    if _ntasks > 1 and "SLURM_PROCID" in os.environ:
+        rank = int(os.environ["SLURM_PROCID"])
+        world_size = _ntasks
+        print(
+            f"multi-node launch: global rank {rank}/{world_size} "
+            f"local {os.environ.get('SLURM_LOCALID', '?')} "
+            f"on {os.environ.get('SLURMD_NODENAME', '?')}",
+            flush=True,
+        )
+        train_for_folder(
+            rank,
+            world_size,
+            args.root_dir,
+            args.config_name,
+            args.classification_threshold,
+            args.batch_size,
+            args.epochs,
+            args.id_key,
+            args.target_key,
+            args.atomwise_key,
+            args.force_key,
+            args.stresswise_key,
+            args.additional_output_key,
+            args.file_format,
+            args.restart_model_path,
+            args.output_dir,
+        )
+        try:
+            cleanup(world_size)
+        except Exception:
+            pass
+        sys.exit(0)
     world_size = int(torch.cuda.device_count())
     print("world_size", world_size)
     if world_size > 1:
