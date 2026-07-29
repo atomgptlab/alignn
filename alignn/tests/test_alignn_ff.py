@@ -66,10 +66,10 @@ def test_graph_builder():
 
     atoms = Poscar.from_string(pos).atoms
     old_g = Graph.from_atoms(atoms=atoms)
-    g, lg = Graph.atom_dgl_multigraph(atoms)
-    g, lg = Graph.atom_dgl_multigraph(atoms, neighbor_strategy="radius_graph")
+    g, lg = Graph.atom_dgl_multigraph(atoms, neighbor_strategy="pure_torch")
+    g, lg = Graph.atom_dgl_multigraph(atoms, neighbor_strategy="pure_torch")
     g, lg = Graph.atom_dgl_multigraph(
-        atoms, neighbor_strategy="radius_graph_jarvis"
+        atoms, neighbor_strategy="pure_torch"
     )
     g = radius_graph_old(atoms)
 
