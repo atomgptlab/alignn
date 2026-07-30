@@ -29,8 +29,6 @@
 
 The Atomistic Line Graph Neural Network ([paper](https://www.nature.com/articles/s41524-021-00650-1)) introduces a graph convolution layer that explicitly models both two- and three-body interactions in atomistic systems. The ALIGNN-FF variant ([paper](https://pubs.rsc.org/en/content/articlehtml/2023/dd/d2dd00096b)) extends this to a force-field for structurally and chemically diverse systems across 89 elements.
 
-See [docs/index.md](docs/index.md) for the full introduction.
-
 ![ALIGNN layer schematic](https://github.com/atomgptlab/alignn/blob/develop/alignn/tex/schematic_lg.jpg)
 
 > ⚡ **Pure PyTorch — DGL is no longer required.** ALIGNN now runs fully in
