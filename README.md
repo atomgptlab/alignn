@@ -11,7 +11,8 @@
 # Table of Contents
 * [Introduction](#intro)
 * [Installation](#install)
-* [Examples](#example)
+* [Examples — train every model type](#example)
+* [Reproducing a JARVIS-Leaderboard contribution](#reproduce)
 * [Colab notebooks](#colab)
 * [Pre-trained models](#pretrained)
 * [JARVIS-ALIGNN webapp](#webapp)
@@ -47,16 +48,165 @@ See [docs/index.md](docs/index.md) for the full introduction.
 See [docs/installation.md](docs/installation.md) for conda, GitHub, and pip installation methods.
 
 <a name="example"></a>
-## Examples
+## Examples — train every model type
 
-See [docs/training/](docs/training/) for dataset format and training examples:
+All training recipes live on this page. Each one ships a **self-contained,
+runnable example** under [`alignn/examples/recipes/`](alignn/examples/recipes/)
+with a `make_toy_dataset.py` (generates a tiny synthetic `id_prop.json`), a
+`config_example.json`, and its own detailed `README.md`. Every recipe below runs
+in ~1–2 minutes on CPU.
 
-- [Dataset format](docs/training/dataset-format.md)
-- [Single-output regression](docs/training/single-output-regression.md)
-- [Classification](docs/training/classification.md)
-- [Multi-output regression](docs/training/multi-output-regression.md)
-- [Force-field training](docs/training/force-field.md)
-- [Multi-GPU training](docs/training/multi-gpu.md)
+> ⚠️ **The toy datasets are smoke tests, not real models.** They are 40 rattled
+> Si cells with synthetic labels, meant only to prove the pipeline runs. For a
+> usable model, replace the structures/labels with **real DFT data**
+> (thousands → millions of entries), raise `epochs` to **100–300** and
+> `batch_size` to **32–64**, and expect to use a GPU. See each recipe's README.
+
+| Recipe | Task | Graph | Example dir |
+| --- | --- | --- | --- |
+| kNN | scalar property | kNN (cutoff 8) | [`recipes/knn`](alignn/examples/recipes/knn) |
+| Radius | scalar property (MD-compatible) | radius (cutoff 5) | [`recipes/radius`](alignn/examples/recipes/radius) |
+| Tensor | D-dim response tensor | kNN | [`recipes/tensor`](alignn/examples/recipes/tensor) |
+| Spectra | DOS / Raman curve | kNN | [`recipes/spectra`](alignn/examples/recipes/spectra) |
+| Force field | energy + forces + stress | radius | [`recipes/forcefield`](alignn/examples/recipes/forcefield) |
+| Atomwise | per-atom charge / moment | kNN | [`recipes/atomwise`](alignn/examples/recipes/atomwise) |
+
+Every recipe reads an `id_prop.json`: a JSON list where each entry has a `jid`,
+an inline jarvis `Atoms` dict, and the target(s). See
+[Dataset format](docs/training/dataset-format.md) for the full spec.
+
+<details>
+<summary><b>1. kNN graph — scalar property</b> (formation energy, band gap, Tc, …)</summary>
+
+Wider k-nearest-neighbour graph (`cutoff: 8.0`, `max_neighbors: 12`) — the more
+accurate choice for property prediction.
+
+```bash
+cd alignn/examples/recipes/knn
+python make_toy_dataset.py                    # -> id_prop.json (40 toy entries)
+train_alignn.py --root_dir . --config_name config_example.json \
+    --output_dir toy_out --target_key target --id_key jid
+```
+Key knobs: `cutoff: 8.0`, `model.output_features: 1`, `graphwise_weight: 1.0`,
+`calculate_gradient: false`. More: [recipes/knn/README.md](alignn/examples/recipes/knn/README.md).
+</details>
+
+<details>
+<summary><b>2. Radius graph — scalar property</b> (MD-compatible neighbour list)</summary>
+
+Same scalar task, but the fixed-radius graph (`cutoff: 5.0`) that is continuous
+under displacement — use it when you need MD-consistency.
+
+```bash
+cd alignn/examples/recipes/radius
+python make_toy_dataset.py
+train_alignn.py --root_dir . --config_name config_example.json \
+    --output_dir toy_out --target_key target --id_key jid
+```
+Key knobs: `cutoff: 5.0` (vs 8.0 for kNN). More: [recipes/radius/README.md](alignn/examples/recipes/radius/README.md).
+</details>
+
+<details>
+<summary><b>3. Tensor property</b> (dielectric D=9, piezo D=18, elastic D=36)</summary>
+
+Predict a fixed-length response tensor per structure. Target is a length-`D` list.
+
+```bash
+cd alignn/examples/recipes/tensor
+python make_toy_dataset.py
+train_alignn.py --root_dir . --config_name config_example.json \
+    --output_dir toy_out --target_key target --id_key jid
+```
+Key knobs: set `model.output_features` to your tensor dimension (9/18/36) and
+match `D` in `make_toy_dataset.py`. More: [recipes/tensor/README.md](alignn/examples/recipes/tensor/README.md).
+</details>
+
+<details>
+<summary><b>4. Spectra / multi-output curve</b> (eDOS 300, pDOS 200, Raman 200)</summary>
+
+Predict a full curve on a fixed grid. Target is a length-`D` list (one per bin).
+
+```bash
+cd alignn/examples/recipes/spectra
+python make_toy_dataset.py
+train_alignn.py --root_dir . --config_name config_example.json \
+    --output_dir toy_out --target_key target --id_key jid
+```
+Key knobs: `model.output_features` = number of bins (200/300); match `D` in the
+toy script. More: [recipes/spectra/README.md](alignn/examples/recipes/spectra/README.md).
+</details>
+
+<details>
+<summary><b>5. Force field</b> (energy + forces + stress, ALIGNN-FF)</summary>
+
+Train an interatomic potential with energy-conserving (gradient) forces and
+stress — usable for relaxation, MD, and LAMMPS (`pair_alignn`).
+
+```bash
+cd alignn/examples/recipes/forcefield
+python make_toy_dataset.py
+train_alignn.py --root_dir . --config_name config_example.json \
+    --output_dir toy_out --target_key energy_per_atom --force_key forces --id_key jid
+```
+Key knobs: `model.calculate_gradient: true`, and the loss mixture
+`graphwise_weight` (energy) / `gradwise_weight` (forces) / `stresswise_weight`
+(stress). **Energy must be per atom.** More:
+[recipes/forcefield/README.md](alignn/examples/recipes/forcefield/README.md).
+</details>
+
+<details>
+<summary><b>6. Atomwise property</b> (per-atom charges, magnetic moments)</summary>
+
+Predict one value per atom. Target is a length-`Natoms` list under a per-atom key.
+
+```bash
+cd alignn/examples/recipes/atomwise
+python make_toy_dataset.py
+train_alignn.py --root_dir . --config_name config_example.json \
+    --output_dir toy_out --target_key target --id_key jid --atomwise_key charges
+```
+Key knobs: `model.atomwise_output_features: 1`, `atomwise_weight: 1.0`,
+`graphwise_weight: 0.0`; pass `--atomwise_key charges`. More:
+[recipes/atomwise/README.md](alignn/examples/recipes/atomwise/README.md).
+</details>
+
+For the historical per-topic docs see also [docs/training/](docs/training/)
+(dataset format, classification, multi-GPU).
+
+<a name="reproduce"></a>
+## Reproducing a JARVIS-Leaderboard contribution
+
+Every ALIGNN entry on the [JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard/)
+ships the exact config, split, and `run.sh` used to produce it, so any result can
+be reproduced end to end:
+
+```bash
+# 1) install ALIGNN (pure-PyTorch, no DGL needed)
+pip install alignn
+#    or from source:
+git clone https://github.com/atomgptlab/alignn.git
+cd alignn && pip install -e . && cd ..
+
+# 2) get the leaderboard (holds every contribution's config + data split + run.sh)
+git clone https://github.com/atomgptlab/jarvis_leaderboard.git
+cd jarvis_leaderboard
+pip install -e .
+
+# 3) pick a contribution and re-run it
+#    contributions live under jarvis_leaderboard/contributions/<name>/
+ls jarvis_leaderboard/contributions/alignn_model/
+#    each folder has: the benchmark CSV, metadata.json, and run.sh
+cat jarvis_leaderboard/contributions/alignn_model/run.sh
+bash jarvis_leaderboard/contributions/alignn_model/run.sh
+```
+
+`run.sh` downloads the benchmark's train/val/test split (from the matching
+`jarvis_leaderboard/benchmarks/.../*.json.zip`), writes the `id_prop`/config, and
+calls `train_alignn.py` with the same settings that produced the leaderboard
+number — so you reproduce the published MAE exactly. To submit a new ALIGNN
+result, copy an existing contribution folder, drop in your predictions CSV +
+`metadata.json`, and open a PR (see the leaderboard's `CONTRIBUTING`).
+
 
 <a name="colab"></a>
 ## Colab notebooks
