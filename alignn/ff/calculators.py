@@ -104,8 +104,9 @@ def get_figshare_model_ff(
 
 
 def default_path():
-    """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
+    """Get default model path (ALIGNN 2.0 matpes_smooth, 2/2/128 smooth cutoff)."""
+    dpath = get_figshare_model_ff(model_name="matpes_smooth")
+    # dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")  # previous
     # dpath = get_figshare_model_ff(model_name="v5.27.2024")
     # dpath = get_figshare_model_ff(model_name="v8.29.2024_dft_3d")
     # dpath = get_figshare_model_ff(model_name="alignnff_wt10")
@@ -315,14 +316,17 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 (
                     g.to(self.device),
                     lg.to(self.device),
-                    torch.tensor(atoms.cell)
+                    torch.tensor(np.array(atoms.cell))
                     .type(torch.get_default_dtype())
                     .to(self.device),
                 )
             )
         else:
             result = self.model(
-                (g.to(self.device), torch.tensor(atoms.cell).to(self.device))
+                (
+                    g.to(self.device),
+                    torch.tensor(np.array(atoms.cell)).to(self.device),
+                )
             )
         # print("result",result)
         if "atomwise" in self.config["model"]["name"]:
