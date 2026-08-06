@@ -259,7 +259,8 @@ print(calc.predictions())                    # extra property predictors
 ```
 
 A single pydantic config selects the outputs (force-field
-energy/forces/stress plus any pretrained scalar property predictors).
+energy/forces/stress plus any pretrained ALIGNN 2.0 property predictors —
+scalar, spectra, or D-dim tensor; radius or kNN graph).
 See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for more,
 and the ASE docs page *Calculators → ALIGNN*.
 
