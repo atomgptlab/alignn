@@ -1,7 +1,7 @@
 # Performance
 
 ALIGNN has been benchmarked across many public materials datasets. For the most
-up-to-date numbers see [JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard/).
+up-to-date numbers see [JARVIS-Leaderboard](https://atomgptlab.github.io/jarvis_leaderboard/).
 
 ## JARVIS-DFT 2021 — classification
 
@@ -87,6 +87,6 @@ OMDB, HOPV, QETB.
 ---
 
 Claims of *best* performance should be verified on the latest
-[JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard/). Numbers from models
+[JARVIS-Leaderboard](https://atomgptlab.github.io/jarvis_leaderboard/). Numbers from models
 other than ALIGNN are reported as-published by the original authors and are not
 necessarily reproduced in-house.

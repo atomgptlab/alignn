@@ -188,6 +188,16 @@ class TrainingConfig(BaseSettings):
     # DDP tuning. find_unused_parameters=True is slow; enable only if
     # your model has conditional branches whose gradients vary per step.
     ddp_find_unused_parameters: bool = False
+    # Resume optimizer/scheduler/epoch from <output_dir>/current_state.pt if
+    # present. Lets a run that hit the walltime continue with a single
+    # continuous LR schedule instead of restarting it (weights alone are
+    # restored via --restart_model_path, which does not restore these).
+    resume_checkpoint: bool = False
+    # LR-schedule horizon in epochs, independent of how many epochs this job
+    # runs (`epochs`). Set it to the FINAL target when a run is split into
+    # resumed segments so OneCycle spans the whole run and stays continuous
+    # across restarts. None => use `epochs` (the single-job default).
+    lr_total_epochs: Optional[int] = None
     # When True, forces cuDNN determinism (slower). Decoupled from seed so
     # you can seed for reproducibility without paying the speed cost.
     deterministic: bool = False

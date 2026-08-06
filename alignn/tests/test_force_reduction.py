@@ -4,14 +4,30 @@ from torch import nn
 from torch.nn import functional as F
 from jarvis.core.atoms import Atoms
 
-import dgl
-import dgl.function as fn
-from dgl.nn import SumPooling
-
-from alignn.models.alignn import EdgeGatedGraphConv
+# Pure-PyTorch equivalents (no DGL required). ``EdgeGatedGraphConvPure`` is
+# the scatter-based edge-gated conv, and ``scatter_sum`` provides the
+# segment-sum used for message reduction (replacing dgl.update_all /
+# dgl.reverse). The radius graph is built natively in torch below.
+from alignn.models.alignn_atomwise_pure import (
+    EdgeGatedGraphConvPure,
+    scatter_sum,
+)
 
 # double precision for gradient checking
 torch.set_default_dtype(torch.float64)
+
+
+def torch_radius_graph(positions, cutoff):
+    """Non-periodic radius graph as (src, dst) edge tensors (no self-loops).
+
+    Pure-torch replacement for ``dgl.radius_graph(positions, cutoff)``:
+    an edge (i, j) exists when 0 < ||r_i - r_j|| <= cutoff.
+    """
+    diff = positions.unsqueeze(1) - positions.unsqueeze(0)  # [N, N, 3]
+    dist = torch.norm(diff, dim=-1)  # [N, N]
+    mask = (dist <= cutoff) & (dist > 0)
+    src, dst = torch.where(mask)
+    return src, dst
 
 jvasp_98225_data = {
     "lattice_mat": [
@@ -137,11 +153,9 @@ class SimpleModel(nn.Module):
         self.width = width
 
         self.edge_embedding = nn.Linear(1, width)
-        self.hidden1 = EdgeGatedGraphConv(width, width)
-        self.hidden2 = EdgeGatedGraphConv(width, width)
+        self.hidden1 = EdgeGatedGraphConvPure(width, width)
+        self.hidden2 = EdgeGatedGraphConvPure(width, width)
         self.fc = nn.Linear(width, 1)
-
-        self.readout = SumPooling()
 
     def forward(self, positions, autograd_forces=False):
 
@@ -149,31 +163,29 @@ class SimpleModel(nn.Module):
         if autograd_forces:
             positions.requires_grad_(True)
 
-        # non-periodic radius graph construction
-        g = dgl.radius_graph(positions, self.cutoff)
-        g.ndata["r"] = positions
+        # non-periodic radius graph construction (pure torch)
+        src, dst = torch_radius_graph(positions, self.cutoff)
+        num_nodes = positions.shape[0]
 
-        # compute bond displacement vectors
-        g.apply_edges(fn.v_sub_u("r", "r", "bondvec"))
-        bondvec = g.edata.pop("bondvec")
+        # compute bond displacement vectors: r_dst - r_src
+        bondvec = positions[dst] - positions[src]
         bondlength = torch.norm(bondvec, dim=1).squeeze()
 
         # expand bond length basis functions
         y = self.edge_embedding(bondlength.unsqueeze(-1))
-        g.edata["y"] = y
 
         # constant node features
-        x = torch.ones(g.num_nodes(), self.width)
+        x = torch.ones(num_nodes, self.width)
 
-        # graph convolution layers
-        x, y = self.hidden1(g, x, y)
-        x, y = self.hidden2(g, x, y)
+        # graph convolution layers (scatter-based, edge index tensors)
+        x, y = self.hidden1.forward_tensors(src, dst, num_nodes, x, y)
+        x, y = self.hidden2.forward_tensors(src, dst, num_nodes, x, y)
 
         # node-wise prediction
         energy = self.fc(x)
 
-        # reduction
-        total_energy = torch.squeeze(self.readout(g, energy))
+        # reduction (sum pooling over the single graph)
+        total_energy = torch.squeeze(energy.sum(dim=0))
 
         if not autograd_forces:
             return total_energy
@@ -190,21 +202,15 @@ class SimpleModel(nn.Module):
         # combine r_{ji} and r_{ij}
         pairwise_forces = -torch.autograd.grad(total_energy, bondvec)[0]
 
-        # reduce over bonds to get forces on each atom
-        g.edata["pairwise_forces"] = pairwise_forces
-        g.update_all(
-            fn.copy_e("pairwise_forces", "m"), fn.sum("m", "forces_ji")
-        )
+        # reduce over bonds to get forces on each atom.
+        # forces_ji: sum of pairwise forces over edges arriving at each node
+        # (dst) -- replaces g.update_all(copy_e, sum).
+        forces_ji = scatter_sum(pairwise_forces, dst, num_nodes)
+        # forces_ij: sum over reverse edges (src) -- replaces the
+        # dgl.reverse(g) + update_all path.
+        forces_ij = scatter_sum(pairwise_forces, src, num_nodes)
 
-        # reduce over reverse edges too!
-        rg = dgl.reverse(g, copy_edata=True)
-        rg.update_all(
-            fn.copy_e("pairwise_forces", "m"), fn.sum("m", "forces_ij")
-        )
-
-        forces_vec = torch.squeeze(
-            g.ndata["forces_ji"] - rg.ndata["forces_ij"]
-        )
+        forces_vec = torch.squeeze(forces_ji - forces_ij)
 
         return total_energy, forces_x, forces_vec
 

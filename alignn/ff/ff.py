@@ -207,8 +207,9 @@ def get_figshare_model_prop(
 
 
 def default_path():
-    """Get default model path."""
-    dpath = get_figshare_model_ff(model_name="mps")
+    """Get default model path (ALIGNN 2.0 matpes_smooth, 2/2/128 smooth cutoff)."""
+    dpath = get_figshare_model_ff(model_name="matpes_smooth")
+    # dpath = get_figshare_model_ff(model_name="mps")  # previous default
     # dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
     # dpath = get_figshare_model_ff(model_name="v5.27.2024")
     # dpath = get_figshare_model_ff(model_name="v8.29.2024_dft_3d")
@@ -351,9 +352,9 @@ class ForceField(object):
         except Exception:
             pass
         line += (
-            f"a={self.atoms.get_cell()[0,0]: 3.3f} Ang "
-            + f"b={self.atoms.get_cell()[1,1]: 3.3f} Ang "
-            + f"c={self.atoms.get_cell()[2,2]: 3.3f} Ang "
+            f"a={self.atoms.get_cell()[0, 0]: 3.3f} Ang "
+            + f"b={self.atoms.get_cell()[1, 1]: 3.3f} Ang "
+            + f"c={self.atoms.get_cell()[2, 2]: 3.3f} Ang "
             + f"Volume={self.atoms.get_volume(): 3.3f} amu/a3 "
             + f"PE={self.atoms.get_potential_energy(): 5.5f} eV "
             + f"KE={self.atoms.get_kinetic_energy(): 5.5f} eV "

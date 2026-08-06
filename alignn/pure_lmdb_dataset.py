@@ -69,10 +69,27 @@ class PureTorchLMDBDataset(Dataset):
         self.lmdb_path = lmdb_path
         self.ids = ids or []
         self.line_graph = line_graph
-        self.env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
-        with self.env.begin() as txn:
+        # Open lazily: an lmdb.Environment cannot be pickled, so holding one
+        # here breaks DataLoader(num_workers>0), which pickles the dataset to
+        # each worker. Each process opens its own handle on first access.
+        self.env = None
+        _env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
+        with _env.begin() as txn:
             self.length = txn.stat()["entries"]
+        _env.close()
         self.prepare_batch = prepare_pure_batch
+
+    def _get_env(self):
+        """Return this process's LMDB handle, opening it on first use."""
+        if self.env is None:
+            self.env = lmdb.open(self.lmdb_path, readonly=True, lock=False)
+        return self.env
+
+    def __getstate__(self):
+        """Drop the unpicklable LMDB handle when sent to a worker."""
+        state = self.__dict__.copy()
+        state["env"] = None
+        return state
 
     def __len__(self):
         """Return the number of records in the LMDB."""
@@ -80,7 +97,7 @@ class PureTorchLMDBDataset(Dataset):
 
     def __getitem__(self, idx):
         """Load and unpickle the ``idx``-th record."""
-        with self.env.begin() as txn:
+        with self._get_env().begin() as txn:
             serialized = txn.get(f"{idx}".encode())
         if self.line_graph:
             g, lg, lattice, label = pk.loads(serialized)
@@ -125,14 +142,18 @@ class PureTorchLMDBDataset(Dataset):
 def _attach_node_payload(
     g: TorchGraph, key: str, value: np.ndarray, natoms: int
 ):
-    """Tile a per-structure tensor across nodes, like the DGL loader."""
+    """Tile a per-structure (global) tensor across nodes, like the DGL loader.
+
+    All callers pass a per-structure quantity (stress 3x3, extra_features,
+    additional_output) that must be broadcast to every node; genuine per-node
+    arrays (forces, atomwise targets) are assigned to ``g.ndata`` directly.
+    We therefore always tile. A previous ``shape[0] == natoms`` early-return
+    mis-fired for a 3x3 stress on a 3-atom cell (3 == 3), storing it as a
+    2-D per-node array and crashing batch collation (``got 2 and 3``) once
+    the batch mixed 3-atom and non-3-atom structures.
+    """
     dtype = torch.get_default_dtype()
     arr = np.asarray(value)
-    # Per-node array already: first dim matches num nodes.
-    if arr.ndim >= 1 and arr.shape[0] == natoms:
-        g.ndata[key] = torch.as_tensor(arr, dtype=dtype)
-        return
-    # Otherwise, broadcast / tile across nodes.
     tiled = np.broadcast_to(arr, (natoms,) + arr.shape).copy()
     g.ndata[key] = torch.as_tensor(tiled, dtype=dtype)
 
