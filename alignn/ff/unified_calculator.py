@@ -44,46 +44,63 @@ from alignn.ff.calculators import (
     ase_to_atoms,
 )
 from alignn.graphs import Graph
-from alignn.pretrained import get_figshare_model
-
-# friendly name -> figshare model name (extend freely; raw figshare
-# names ending in "_alignn" are also accepted as-is)
-PROP_ALIASES: Dict[str, str] = {
-    "formation_energy_peratom": "jv_formation_energy_peratom_alignn",
-    "total_energy": "jv_optb88vdw_total_energy_alignn",
-    "optb88vdw_bandgap": "jv_optb88vdw_bandgap_alignn",
-    "mbj_bandgap": "jv_mbj_bandgap_alignn",
-    "bulk_modulus_kv": "jv_bulk_modulus_kv_alignn",
-    "shear_modulus_gv": "jv_shear_modulus_gv_alignn",
-    "ehull": "jv_ehull_alignn",
-    "spillage": "jv_spillage_alignn",
-    "slme": "jv_slme_alignn",
-    "magmom_oszicar": "jv_magmom_oszicar_alignn",
-    "exfoliation_energy": "jv_exfoliation_energy_alignn",
-    "supercon_tc": "jv_supercon_tc_alignn",
-    "epsx": "jv_epsx_alignn",
-    "n_seebeck": "jv_n-Seebeck_alignn",
-    "n_powerfact": "jv_n-powerfact_alignn",
-}
+from alignn.pretrained2 import (
+    get_alignn2_model,
+    resolve_by_target,
+    ALIGNN2_MODELS,
+)
+from alignn.models.alignn_atomwise_pure import (
+    ALIGNNAtomWisePure,
+    ALIGNNAtomWisePureConfig,
+)
+import json as _json
 
 
-def _resolve_prop(name: str) -> str:
-    """friendly or raw -> figshare model name."""
-    if name in PROP_ALIASES:
-        return PROP_ALIASES[name]
-    if name.endswith("_alignn"):  # raw figshare name passed through
-        return name
-    raise ValueError(
-        f"Unknown property '{name}'. Known: "
-        f"{sorted(PROP_ALIASES)} (or a raw *_alignn figshare name)."
-    )
+def _prop2_name(friendly, graph):
+    """Resolve a friendly property name to a pretrained2 model key, preferring the
+    requested graph. Handles all three registry conventions: a direct model name
+    (``elastic_tensor``), ``{name}_{graph}`` (``ir_radius``), and target lookup
+    (``formation_energy_peratom`` -> ``..._radius``). Falls back to the other graph
+    when only one variant exists (e.g. ``raman`` -> ``raman_knn``)."""
+    if friendly in ALIGNN2_MODELS:            # direct model name
+        return friendly
+    other = "knn" if graph == "radius" else "radius"
+    for g in (graph, other):                  # {name}_{graph}
+        if "{}_{}".format(friendly, g) in ALIGNN2_MODELS:
+            return "{}_{}".format(friendly, g)
+    cands = resolve_by_target(friendly)       # by training target
+    if cands:
+        pref = [m for m in cands if m.endswith("_" + graph)]
+        return (pref or cands)[0]
+    raise KeyError("No pretrained2 property model for '{}'".format(friendly))
+
+
+def _load_prop2_model(friendly, graph, device):
+    """Load a pure-PyTorch ALIGNN 2.0 property model (pretrained2) for `friendly`
+    on the requested `graph` ("radius"/"knn"). Scalar, spectra (D>1) and tensor
+    outputs are all supported. Returns a dict with the model and its own
+    graph-construction settings (cutoff/max_neighbors/atom_features)."""
+    name = _prop2_name(friendly, graph)
+    paths = get_alignn2_model(name)
+    cfg = _json.load(open(paths["config.json"]))
+    model = ALIGNNAtomWisePure(ALIGNNAtomWisePureConfig(**cfg["model"]))
+    model.load_state_dict(torch.load(
+        paths["best_model.pt"], map_location=device, weights_only=False))
+    model.to(device).eval()
+    return {
+        "model": model, "name": name,
+        "cutoff": float(cfg.get("cutoff", 5.0)),
+        "max_neighbors": int(cfg.get("max_neighbors", 12)),
+        "atom_features": cfg.get("atom_features", "cgcnn"),
+        "use_canonize": bool(cfg.get("use_canonize", False)),
+    }
 
 
 class AlignnUnifiedConfig(BaseModel):
     """Declarative spec of what the calculator should output."""
 
     # force-field model (energy/forces/stress source)
-    ff_model: str = "v12.2.2024_dft_3d_307k"
+    ff_model: str = "matpes_smooth"
     energy: bool = True
     forces: bool = True
     stress: bool = True
@@ -94,8 +111,10 @@ class AlignnUnifiedConfig(BaseModel):
 
     # shared knobs
     device: Optional[str] = None
-    prop_cutoff: float = 8.0
-    prop_max_neighbors: int = 12
+    # property-predictor graph: "radius" (default, FF-compatible) or "knn".
+    # Uses the pure-PyTorch ALIGNN 2.0 models from pretrained2; each carries its
+    # own cutoff/max_neighbors from its training config.
+    prop_graph: str = "radius"
 
     model_config = {"extra": "forbid"}
 
@@ -103,7 +122,10 @@ class AlignnUnifiedConfig(BaseModel):
     @classmethod
     def _check_props(cls, v: List[str]) -> List[str]:
         for p in v:
-            _resolve_prop(p)  # raises on unknown
+            try:  # scalar, spectra or tensor ALIGNN 2.0 model must exist
+                _prop2_name(p, "radius")
+            except KeyError as exc:
+                raise ValueError(str(exc))
         return v
 
     @classmethod
@@ -161,31 +183,36 @@ class AlignnUnifiedCalculator(Calculator):
                 ff_kwargs["path"] = _ff_model_path(config.ff_model)
             self._ff = AlignnAtomwiseCalculator(**ff_kwargs)
 
-        # --- property predictor models (each loaded ONCE) ---
-        self._prop_models: Dict[str, object] = {}
+        # --- property predictor models (pure-torch ALIGNN 2.0, loaded ONCE) ---
+        self._prop_models: Dict[str, dict] = {}
         for friendly in config.properties:
-            self._prop_models[friendly] = get_figshare_model(
-                _resolve_prop(friendly)
+            self._prop_models[friendly] = _load_prop2_model(
+                friendly, config.prop_graph, self.device
             )
 
     # -- scalar property forward (reuses cached model, no reload) -------
-    def _predict_scalar(self, model, j_atoms) -> float:
+    def _predict_scalar(self, info, j_atoms) -> float:
+        # pure-torch graph at the property model's own cutoff/neighbors
         g, lg = Graph.atom_dgl_multigraph(
             j_atoms,
-            cutoff=float(self.cfg.prop_cutoff),
-            max_neighbors=self.cfg.prop_max_neighbors,
+            neighbor_strategy="pure_torch",
+            cutoff=info["cutoff"],
+            max_neighbors=info["max_neighbors"],
+            atom_features=info["atom_features"],
+            use_canonize=info["use_canonize"],
         )
-        lat = torch.tensor(j_atoms.lattice_mat)
+        lat = torch.tensor(j_atoms.lattice_mat).type(
+            torch.get_default_dtype())
         with torch.no_grad():
-            out = model(
-                [
+            out = info["model"](
+                (
                     g.to(self.device),
                     lg.to(self.device),
                     lat.to(self.device),
-                ]
+                )
             )
         if isinstance(out, dict):
-            out = out["out"]
+            out = out.get("out", out.get("energy", next(iter(out.values()))))
         arr = out.detach().cpu().numpy().flatten()
         return float(arr[0]) if arr.size == 1 else arr.tolist()
 
@@ -221,9 +248,9 @@ class AlignnUnifiedCalculator(Calculator):
         # scalar property predictors
         if self._prop_models:
             j_atoms = ase_to_atoms(self.atoms)
-            for friendly, model in self._prop_models.items():
+            for friendly, info in self._prop_models.items():
                 self.results[friendly] = self._predict_scalar(
-                    model, j_atoms
+                    info, j_atoms
                 )
 
     # convenience
