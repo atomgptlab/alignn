@@ -10,13 +10,13 @@ would call each MD step — the only runtime dependency is libtorch.
 
 Usage
 -----
+    # default: exports the bundled default_path() model (matpes_smooth)
+    python alignn/scripts/export_torchscript.py --output alignn_scripted.pt
+    # or point at your own checkpoint/config
     python alignn/scripts/export_torchscript.py \
         --checkpoint /path/to/best_model.pt \
         --config     /path/to/config.json \
-        --output     alignn_scripted.pt
-    # test the scripted file on a random structure
-    python alignn/scripts/export_torchscript.py \
-        --checkpoint ... --config ... --output out.pt --test
+        --output     alignn_scripted.pt --test
 
 Design notes
 ------------
@@ -100,8 +100,7 @@ def _smoke_test(scripted: torch.jit.ScriptModule) -> None:
     from alignn.graphs import Graph
     from alignn.torch_graph_builder import torchgraph_from_dgl
 
-    atoms = Poscar.from_string(
-        """Cu
+    atoms = Poscar.from_string("""Cu
 1.0
 3.6 0.0 0.0
 0.0 3.6 0.0
@@ -113,8 +112,7 @@ direct
 0.0 0.5 0.5
 0.5 0.0 0.5
 0.5 0.5 0.0
-"""
-    ).atoms
+""").atoms
     g, _ = Graph.atom_dgl_multigraph(
         atoms,
         neighbor_strategy="fast_graph",
@@ -147,8 +145,20 @@ direct
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--checkpoint", required=True, type=Path)
-    ap.add_argument("--config", required=True, type=Path)
+    ap.add_argument(
+        "--checkpoint",
+        default=None,
+        type=Path,
+        help="Model checkpoint (.pt). Defaults to the bundled default_path() "
+        "model (best_model.pt).",
+    )
+    ap.add_argument(
+        "--config",
+        default=None,
+        type=Path,
+        help="Training config.json. Defaults to the bundled default_path() "
+        "model (config.json).",
+    )
     ap.add_argument("--output", required=True, type=Path)
     ap.add_argument(
         "--atom-features",
@@ -163,6 +173,16 @@ def main() -> None:
         help="Run the scripted model on a tiny Cu-FCC box after saving.",
     )
     args = ap.parse_args()
+
+    # Default to the bundled default_path() model when not given.
+    if args.checkpoint is None or args.config is None:
+        from alignn.ff.calculators import default_path
+
+        d = Path(default_path())
+        if args.checkpoint is None:
+            args.checkpoint = d / "best_model.pt"
+        if args.config is None:
+            args.config = d / "config.json"
 
     # Resolve atom_features: CLI > training config > 'cgcnn'.
     cfg = json.load(open(args.config))

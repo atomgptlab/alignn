@@ -62,13 +62,13 @@ def _prop2_name(friendly, graph):
     (``elastic_tensor``), ``{name}_{graph}`` (``ir_radius``), and target lookup
     (``formation_energy_peratom`` -> ``..._radius``). Falls back to the other graph
     when only one variant exists (e.g. ``raman`` -> ``raman_knn``)."""
-    if friendly in ALIGNN2_MODELS:            # direct model name
+    if friendly in ALIGNN2_MODELS:  # direct model name
         return friendly
     other = "knn" if graph == "radius" else "radius"
-    for g in (graph, other):                  # {name}_{graph}
+    for g in (graph, other):  # {name}_{graph}
         if "{}_{}".format(friendly, g) in ALIGNN2_MODELS:
             return "{}_{}".format(friendly, g)
-    cands = resolve_by_target(friendly)       # by training target
+    cands = resolve_by_target(friendly)  # by training target
     if cands:
         pref = [m for m in cands if m.endswith("_" + graph)]
         return (pref or cands)[0]
@@ -84,11 +84,15 @@ def _load_prop2_model(friendly, graph, device):
     paths = get_alignn2_model(name)
     cfg = _json.load(open(paths["config.json"]))
     model = ALIGNNAtomWisePure(ALIGNNAtomWisePureConfig(**cfg["model"]))
-    model.load_state_dict(torch.load(
-        paths["best_model.pt"], map_location=device, weights_only=False))
+    model.load_state_dict(
+        torch.load(
+            paths["best_model.pt"], map_location=device, weights_only=False
+        )
+    )
     model.to(device).eval()
     return {
-        "model": model, "name": name,
+        "model": model,
+        "name": name,
         "cutoff": float(cfg.get("cutoff", 5.0)),
         "max_neighbors": int(cfg.get("max_neighbors", 12)),
         "atom_features": cfg.get("atom_features", "cgcnn"),
@@ -174,9 +178,7 @@ class AlignnUnifiedCalculator(Calculator):
         # --- force-field calculator (loaded ONCE) ---
         self._ff = None
         if config.energy or config.forces or config.stress:
-            ff_kwargs = dict(
-                include_stress=config.stress, device=self.device
-            )
+            ff_kwargs = dict(include_stress=config.stress, device=self.device)
             if ff_path is not None:
                 ff_kwargs["path"] = ff_path
             elif config.ff_model:
@@ -201,8 +203,7 @@ class AlignnUnifiedCalculator(Calculator):
             atom_features=info["atom_features"],
             use_canonize=info["use_canonize"],
         )
-        lat = torch.tensor(j_atoms.lattice_mat).type(
-            torch.get_default_dtype())
+        lat = torch.tensor(j_atoms.lattice_mat).type(torch.get_default_dtype())
         with torch.no_grad():
             out = info["model"](
                 (
@@ -225,7 +226,8 @@ class AlignnUnifiedCalculator(Calculator):
         # force-field block
         if self._ff is not None:
             self._ff.calculate(
-                self.atoms, properties=properties,
+                self.atoms,
+                properties=properties,
                 system_changes=system_changes,
             )
             if self.cfg.energy:
@@ -249,9 +251,7 @@ class AlignnUnifiedCalculator(Calculator):
         if self._prop_models:
             j_atoms = ase_to_atoms(self.atoms)
             for friendly, info in self._prop_models.items():
-                self.results[friendly] = self._predict_scalar(
-                    info, j_atoms
-                )
+                self.results[friendly] = self._predict_scalar(info, j_atoms)
 
     # convenience
     def predictions(self) -> Dict[str, object]:

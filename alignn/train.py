@@ -336,7 +336,9 @@ def train_dgl(
                 loss4 = 0  # Such as stresses
                 loss5 = 0  # Such as dos
                 if config.model.output_features is not None:
-                    loss1 = getattr(config.model, 'graphwise_weight', 1.0) * criterion(
+                    loss1 = getattr(
+                        config.model, "graphwise_weight", 1.0
+                    ) * criterion(
                         result["out"],
                         dats[-1].to(device),
                     )
@@ -347,9 +349,11 @@ def train_dgl(
                     running_loss1 += loss1.item()
                 if (
                     config.model.atomwise_output_features > 0
-                    and getattr(config.model, 'atomwise_weight', 0.0) != 0
+                    and getattr(config.model, "atomwise_weight", 0.0) != 0
                 ):
-                    loss2 = getattr(config.model, 'atomwise_weight', 0.0) * criterion(
+                    loss2 = getattr(
+                        config.model, "atomwise_weight", 0.0
+                    ) * criterion(
                         result["atomwise_pred"].to(device),
                         dats[0].ndata["atomwise_target"].to(device),
                     )
@@ -361,8 +365,10 @@ def train_dgl(
                     )
                     running_loss2 += loss2.item()
 
-                if getattr(config.model, 'calculate_gradient', False):
-                    loss3 = getattr(config.model, 'gradwise_weight', 0.0) * criterion(
+                if getattr(config.model, "calculate_gradient", False):
+                    loss3 = getattr(
+                        config.model, "gradwise_weight", 0.0
+                    ) * criterion(
                         result["grad"].to(device),
                         dats[0].ndata["atomwise_grad"].to(device),
                     )
@@ -373,7 +379,7 @@ def train_dgl(
                         result["grad"].cpu().detach().numpy().tolist()
                     )
                     running_loss3 += loss3.item()
-                if getattr(config.model, 'stresswise_weight', 0.0) != 0:
+                if getattr(config.model, "stresswise_weight", 0.0) != 0:
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
@@ -381,7 +387,9 @@ def train_dgl(
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
-                    loss4 = getattr(config.model, 'stresswise_weight', 0.0) * criterion(
+                    loss4 = getattr(
+                        config.model, "stresswise_weight", 0.0
+                    ) * criterion(
                         pred_stress.to(device),
                         targ_stress.to(device),
                     )
@@ -486,9 +494,9 @@ def train_dgl(
                 loss4 = 0
                 loss5 = 0
                 if config.model.output_features is not None:
-                    loss1 = getattr(config.model, 'graphwise_weight', 1.0) * criterion(
-                        result["out"], dats[-1].to(device)
-                    )
+                    loss1 = getattr(
+                        config.model, "graphwise_weight", 1.0
+                    ) * criterion(result["out"], dats[-1].to(device))
                     info["target_out"] = dats[-1].cpu().numpy().tolist()
                     info["pred_out"] = (
                         result["out"].cpu().detach().numpy().tolist()
@@ -497,9 +505,11 @@ def train_dgl(
 
                 if (
                     config.model.atomwise_output_features > 0
-                    and getattr(config.model, 'atomwise_weight', 0.0) != 0
+                    and getattr(config.model, "atomwise_weight", 0.0) != 0
                 ):
-                    loss2 = getattr(config.model, 'atomwise_weight', 0.0) * criterion(
+                    loss2 = getattr(
+                        config.model, "atomwise_weight", 0.0
+                    ) * criterion(
                         result["atomwise_pred"].to(device),
                         dats[0].ndata["atomwise_target"].to(device),
                     )
@@ -510,8 +520,10 @@ def train_dgl(
                         result["atomwise_pred"].cpu().detach().numpy().tolist()
                     )
                     val_loss2 += loss2.item()
-                if getattr(config.model, 'calculate_gradient', False):
-                    loss3 = getattr(config.model, 'gradwise_weight', 0.0) * criterion(
+                if getattr(config.model, "calculate_gradient", False):
+                    loss3 = getattr(
+                        config.model, "gradwise_weight", 0.0
+                    ) * criterion(
                         result["grad"].to(device),
                         dats[0].ndata["atomwise_grad"].to(device),
                     )
@@ -522,7 +534,7 @@ def train_dgl(
                         result["grad"].cpu().detach().numpy().tolist()
                     )
                     val_loss3 += loss3.item()
-                if getattr(config.model, 'stresswise_weight', 0.0) != 0:
+                if getattr(config.model, "stresswise_weight", 0.0) != 0:
                     targ_stress = torch.stack(
                         [
                             gg.ndata["stresses"][0]
@@ -530,7 +542,9 @@ def train_dgl(
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
-                    loss4 = getattr(config.model, 'stresswise_weight', 0.0) * criterion(
+                    loss4 = getattr(
+                        config.model, "stresswise_weight", 0.0
+                    ) * criterion(
                         pred_stress.to(device),
                         targ_stress.to(device),
                     )
@@ -672,9 +686,7 @@ def train_dgl(
                         ]
                     )
                 else:
-                    result = eval_net(
-                        [dats[0].to(device), dats[1].to(device)]
-                    )
+                    result = eval_net([dats[0].to(device), dats[1].to(device)])
                 loss1 = 0
                 loss2 = 0
                 loss3 = 0
@@ -683,16 +695,18 @@ def train_dgl(
                     config.model.output_features is not None
                     and not classification
                 ):
-                    loss1 = getattr(config.model, 'graphwise_weight', 1.0) * criterion(
-                        result["out"], dats[-1].to(device)
-                    )
+                    loss1 = getattr(
+                        config.model, "graphwise_weight", 1.0
+                    ) * criterion(result["out"], dats[-1].to(device))
                     info["target_out"] = dats[-1].cpu().numpy().tolist()
                     info["pred_out"] = (
                         result["out"].cpu().detach().numpy().tolist()
                     )
 
                 if config.model.atomwise_output_features > 0:
-                    loss2 = getattr(config.model, 'atomwise_weight', 0.0) * criterion(
+                    loss2 = getattr(
+                        config.model, "atomwise_weight", 0.0
+                    ) * criterion(
                         result["atomwise_pred"].to(device),
                         dats[0].ndata["atomwise_target"].to(device),
                     )
@@ -703,8 +717,10 @@ def train_dgl(
                         result["atomwise_pred"].cpu().detach().numpy().tolist()
                     )
 
-                if getattr(config.model, 'calculate_gradient', False):
-                    loss3 = getattr(config.model, 'gradwise_weight', 0.0) * criterion(
+                if getattr(config.model, "calculate_gradient", False):
+                    loss3 = getattr(
+                        config.model, "gradwise_weight", 0.0
+                    ) * criterion(
                         result["grad"].to(device),
                         dats[0].ndata["atomwise_grad"].to(device),
                     )
@@ -714,7 +730,7 @@ def train_dgl(
                     info["pred_grad"] = (
                         result["grad"].cpu().detach().numpy().tolist()
                     )
-                if getattr(config.model, 'stresswise_weight', 0.0) != 0:
+                if getattr(config.model, "stresswise_weight", 0.0) != 0:
 
                     targ_stress = torch.stack(
                         [
@@ -723,7 +739,9 @@ def train_dgl(
                         ]
                     ).to(device)
                     pred_stress = result["stresses"]
-                    loss4 = getattr(config.model, 'stresswise_weight', 0.0) * criterion(
+                    loss4 = getattr(
+                        config.model, "stresswise_weight", 0.0
+                    ) * criterion(
                         pred_stress.to(device),
                         targ_stress.to(device),
                     )
@@ -821,7 +839,7 @@ def train_dgl(
             config.write_predictions
             and not classification
             and config.model.output_features == 1
-            and getattr(config.model, 'gradwise_weight', 0.0) == 0
+            and getattr(config.model, "gradwise_weight", 0.0) == 0
         ):
             best_model.eval()
             f = open(

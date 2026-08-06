@@ -352,9 +352,9 @@ class ForceField(object):
         except Exception:
             pass
         line += (
-            f"a={self.atoms.get_cell()[0,0]: 3.3f} Ang "
-            + f"b={self.atoms.get_cell()[1,1]: 3.3f} Ang "
-            + f"c={self.atoms.get_cell()[2,2]: 3.3f} Ang "
+            f"a={self.atoms.get_cell()[0, 0]: 3.3f} Ang "
+            + f"b={self.atoms.get_cell()[1, 1]: 3.3f} Ang "
+            + f"c={self.atoms.get_cell()[2, 2]: 3.3f} Ang "
             + f"Volume={self.atoms.get_volume(): 3.3f} amu/a3 "
             + f"PE={self.atoms.get_potential_energy(): 5.5f} eV "
             + f"KE={self.atoms.get_kinetic_energy(): 5.5f} eV "

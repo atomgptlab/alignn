@@ -1169,105 +1169,207 @@ ALIGNN2_MODELS = {
         "description": "Per-atom net charge (atomwise head).",
     },
     "omdb_bandgap_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "bandgap", "unit": "", "test_mae": 0.2428,
-        "figshare_article_id": 33135329, "url": "https://ndownloader.figshare.com/files/67163978",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "bandgap",
+        "unit": "",
+        "test_mae": 0.2428,
+        "figshare_article_id": 33135329,
+        "url": "https://ndownloader.figshare.com/files/67163978",
         "description": "omdb bandgap (radius).",
     },
     "omdb_bandgap_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "bandgap", "unit": "", "test_mae": 0.2411,
-        "figshare_article_id": 33135332, "url": "https://ndownloader.figshare.com/files/67163981",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "bandgap",
+        "unit": "",
+        "test_mae": 0.2411,
+        "figshare_article_id": 33135332,
+        "url": "https://ndownloader.figshare.com/files/67163981",
         "description": "omdb bandgap (knn).",
     },
     "pdbbind_binding_affinity_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "binding_affinity", "unit": "", "test_mae": 1.5833,
-        "figshare_article_id": 33135335, "url": "https://ndownloader.figshare.com/files/67163984",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "binding_affinity",
+        "unit": "",
+        "test_mae": 1.5833,
+        "figshare_article_id": 33135335,
+        "url": "https://ndownloader.figshare.com/files/67163984",
         "description": "pdbbind binding_affinity (radius).",
     },
     "pdbbind_binding_affinity_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "binding_affinity", "unit": "", "test_mae": 2.7265,
-        "figshare_article_id": 33135338, "url": "https://ndownloader.figshare.com/files/67163987",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "binding_affinity",
+        "unit": "",
+        "test_mae": 2.7265,
+        "figshare_article_id": 33135338,
+        "url": "https://ndownloader.figshare.com/files/67163987",
         "description": "pdbbind binding_affinity (knn).",
     },
     "halide_peroskites_PBE_gap_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "PBE_gap", "unit": "", "test_mae": 0.1010,
-        "figshare_article_id": 33135395, "url": "https://ndownloader.figshare.com/files/67164095",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "PBE_gap",
+        "unit": "",
+        "test_mae": 0.1010,
+        "figshare_article_id": 33135395,
+        "url": "https://ndownloader.figshare.com/files/67164095",
         "description": "halide_peroskites PBE_gap (radius).",
     },
     "halide_peroskites_PBE_gap_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "PBE_gap", "unit": "", "test_mae": 0.0867,
-        "figshare_article_id": 33135398, "url": "https://ndownloader.figshare.com/files/67164098",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "PBE_gap",
+        "unit": "",
+        "test_mae": 0.0867,
+        "figshare_article_id": 33135398,
+        "url": "https://ndownloader.figshare.com/files/67164098",
         "description": "halide_peroskites PBE_gap (knn).",
     },
     "halide_peroskites_HSE_gap_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "HSE_gap", "unit": "", "test_mae": 0.1397,
-        "figshare_article_id": 33135401, "url": "https://ndownloader.figshare.com/files/67164101",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "HSE_gap",
+        "unit": "",
+        "test_mae": 0.1397,
+        "figshare_article_id": 33135401,
+        "url": "https://ndownloader.figshare.com/files/67164101",
         "description": "halide_peroskites HSE_gap (radius).",
     },
     "halide_peroskites_HSE_gap_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "HSE_gap", "unit": "", "test_mae": 0.1383,
-        "figshare_article_id": 33135404, "url": "https://ndownloader.figshare.com/files/67164104",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "HSE_gap",
+        "unit": "",
+        "test_mae": 0.1383,
+        "figshare_article_id": 33135404,
+        "url": "https://ndownloader.figshare.com/files/67164104",
         "description": "halide_peroskites HSE_gap (knn).",
     },
     "halide_peroskites_Ref_ind_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "Ref_ind", "unit": "", "test_mae": 0.0127,
-        "figshare_article_id": 33135416, "url": "https://ndownloader.figshare.com/files/67164140",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "Ref_ind",
+        "unit": "",
+        "test_mae": 0.0127,
+        "figshare_article_id": 33135416,
+        "url": "https://ndownloader.figshare.com/files/67164140",
         "description": "halide_peroskites Ref_ind (radius).",
     },
     "halide_peroskites_Ref_ind_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "Ref_ind", "unit": "", "test_mae": 0.0127,
-        "figshare_article_id": 33135419, "url": "https://ndownloader.figshare.com/files/67164143",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "Ref_ind",
+        "unit": "",
+        "test_mae": 0.0127,
+        "figshare_article_id": 33135419,
+        "url": "https://ndownloader.figshare.com/files/67164143",
         "description": "halide_peroskites Ref_ind (knn).",
     },
     "halide_peroskites_PBE_decomp_energy_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "PBE_decomp_energy", "unit": "", "test_mae": 0.0265,
-        "figshare_article_id": 33135425, "url": "https://ndownloader.figshare.com/files/67164152",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "PBE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0265,
+        "figshare_article_id": 33135425,
+        "url": "https://ndownloader.figshare.com/files/67164152",
         "description": "halide_peroskites PBE_decomp_energy (radius).",
     },
     "halide_peroskites_PBE_decomp_energy_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "PBE_decomp_energy", "unit": "", "test_mae": 0.0273,
-        "figshare_article_id": 33135428, "url": "https://ndownloader.figshare.com/files/67164155",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "PBE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0273,
+        "figshare_article_id": 33135428,
+        "url": "https://ndownloader.figshare.com/files/67164155",
         "description": "halide_peroskites PBE_decomp_energy (knn).",
     },
     "halide_peroskites_HSE_decomp_energy_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "HSE_decomp_energy", "unit": "", "test_mae": 0.0233,
-        "figshare_article_id": 33135434, "url": "https://ndownloader.figshare.com/files/67164215",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "HSE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0233,
+        "figshare_article_id": 33135434,
+        "url": "https://ndownloader.figshare.com/files/67164215",
         "description": "halide_peroskites HSE_decomp_energy (radius).",
     },
     "halide_peroskites_HSE_decomp_energy_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "HSE_decomp_energy", "unit": "", "test_mae": 0.0233,
-        "figshare_article_id": 33135437, "url": "https://ndownloader.figshare.com/files/67164218",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "HSE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0233,
+        "figshare_article_id": 33135437,
+        "url": "https://ndownloader.figshare.com/files/67164218",
         "description": "halide_peroskites HSE_decomp_energy (knn).",
     },
     "snumat_Band_gap_HSE_radius": {
-        "category": "radius", "graph": "radius", "cutoff": 5.0, "output_features": 1,
-        "target": "Band_gap_HSE", "unit": "", "test_mae": 0.3680,
-        "figshare_article_id": 33135974, "url": "https://ndownloader.figshare.com/files/67166069",
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "Band_gap_HSE",
+        "unit": "",
+        "test_mae": 0.3680,
+        "figshare_article_id": 33135974,
+        "url": "https://ndownloader.figshare.com/files/67166069",
         "description": "snumat Band_gap_HSE (radius).",
     },
     "snumat_Band_gap_HSE_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "Band_gap_HSE", "unit": "", "test_mae": 0.3483,
-        "figshare_article_id": 33135977, "url": "https://ndownloader.figshare.com/files/67166072",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "Band_gap_HSE",
+        "unit": "",
+        "test_mae": 0.3483,
+        "figshare_article_id": 33135977,
+        "url": "https://ndownloader.figshare.com/files/67166072",
         "description": "snumat Band_gap_HSE (knn).",
     },
     "hmof_co2_knn": {
-        "category": "knn", "graph": "knn", "cutoff": 8.0, "output_features": 1,
-        "target": "co2_uptake", "unit": "mol/kg", "test_mae": 0.4687,
-        "figshare_article_id": 33137036, "url": "https://ndownloader.figshare.com/files/67174418",
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "co2_uptake",
+        "unit": "mol/kg",
+        "test_mae": 0.4687,
+        "figshare_article_id": 33137036,
+        "url": "https://ndownloader.figshare.com/files/67174418",
         "description": "hMOF CO2 uptake (knn graph, epoch-99).",
     },
     # --- add new models here (one entry each) ---
@@ -1278,15 +1380,21 @@ _API = "https://api.figshare.com/v2"
 
 def list_alignn2_models(category=None):
     """Return the registry, optionally filtered by category."""
-    return {k: v for k, v in ALIGNN2_MODELS.items()
-            if category is None or v["category"] == category}
+    return {
+        k: v
+        for k, v in ALIGNN2_MODELS.items()
+        if category is None or v["category"] == category
+    }
 
 
 def resolve_by_target(target, category=None):
     """Return registry keys whose ``target`` matches (e.g. a property name)."""
-    return [k for k, v in ALIGNN2_MODELS.items()
-            if v.get("target") == target
-            and (category is None or v["category"] == category)]
+    return [
+        k
+        for k, v in ALIGNN2_MODELS.items()
+        if v.get("target") == target
+        and (category is None or v["category"] == category)
+    ]
 
 
 def _cache_dir():
@@ -1303,20 +1411,28 @@ def get_alignn2_model(name, download=True, cache_dir=None):
     it to ``~/.alignn2_models/<name>/``.
     """
     if name not in ALIGNN2_MODELS:
-        raise KeyError("Unknown model '{}'. Available: {}".format(
-            name, sorted(ALIGNN2_MODELS)))
+        raise KeyError(
+            "Unknown model '{}'. Available: {}".format(
+                name, sorted(ALIGNN2_MODELS)
+            )
+        )
     meta = ALIGNN2_MODELS[name]
     dest = os.path.join(cache_dir or _cache_dir(), name)
     triplet = ["config.json", "best_model.pt", "ids_train_val_test.json"]
-    have = os.path.exists(os.path.join(dest, "best_model.pt")) and \
-        os.path.exists(os.path.join(dest, "config.json"))
+    have = os.path.exists(
+        os.path.join(dest, "best_model.pt")
+    ) and os.path.exists(os.path.join(dest, "config.json"))
     if download and not have:
         os.makedirs(dest, exist_ok=True)
         url = meta.get("url")
         if not url:  # unmigrated fallback: fetch the article's zip file url
-            r = requests.get("{}/articles/{}".format(_API, meta["figshare_article_id"]))
+            r = requests.get(
+                "{}/articles/{}".format(_API, meta["figshare_article_id"])
+            )
             r.raise_for_status()
-            files = {f["name"]: f["download_url"] for f in r.json().get("files", [])}
+            files = {
+                f["name"]: f["download_url"] for f in r.json().get("files", [])
+            }
             url = files.get(meta.get("zip")) or next(iter(files.values()))
         r = requests.get(url, stream=True)
         r.raise_for_status()
@@ -1328,12 +1444,21 @@ def get_alignn2_model(name, download=True, cache_dir=None):
             members = z.namelist()
             sub = meta.get("subdir", "")
             for base in triplet + ["multi_out_predictions.json"]:
-                hit = [n for n in members if n == base or n.endswith("/" + base)]
+                hit = [
+                    n for n in members if n == base or n.endswith("/" + base)
+                ]
                 if sub:
-                    hit = [n for n in hit if ("%s/%s" % (sub, base)) in n] or hit
+                    hit = [
+                        n for n in hit if ("%s/%s" % (sub, base)) in n
+                    ] or hit
                 if hit:
-                    with z.open(hit[0]) as fsrc, open(os.path.join(dest, base), "wb") as fdst:
+                    with z.open(hit[0]) as fsrc, open(
+                        os.path.join(dest, base), "wb"
+                    ) as fdst:
                         fdst.write(fsrc.read())
         os.remove(zp)
-    return {f: os.path.join(dest, f) for f in triplet
-            if os.path.exists(os.path.join(dest, f))}
+    return {
+        f: os.path.join(dest, f)
+        for f in triplet
+        if os.path.exists(os.path.join(dest, f))
+    }
