@@ -10,7 +10,7 @@ would call each MD step — the only runtime dependency is libtorch.
 
 Usage
 -----
-    # default: exports the bundled default_path() model (matpes_smooth)
+    # default: exports the bundled default_path() model (matpes_pbe)
     python alignn/scripts/export_torchscript.py --output alignn_scripted.pt
     # or point at your own checkpoint/config
     python alignn/scripts/export_torchscript.py \

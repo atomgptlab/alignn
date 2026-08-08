@@ -1084,7 +1084,7 @@ ALIGNN2_MODELS = {
         "url": "https://ndownloader.figshare.com/files/67163330",
         "description": "FD-FF + EV/vacancy/surface/interface augmented force field (energy/forces/stress, radius graph).",
     },
-    "matpes_smooth_ff": {
+    "matpes_pbe_ff": {
         "category": "forcefield",
         "graph": "radius",
         "cutoff": 5.0,
@@ -1094,7 +1094,19 @@ ALIGNN2_MODELS = {
         "test_mae": 0.218,
         "figshare_article_id": 33148208,
         "url": "https://ndownloader.figshare.com/files/67217507",
-        "description": "DEFAULT ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet).",
+        "description": "ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet). PBE energy scale.",
+    },
+    "matpes_r2scan_ff": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": 0.0487,
+        "figshare_article_id": 33190782,
+        "url": "https://ndownloader.figshare.com/files/67360764",
+        "description": "DEFAULT ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
     },
     "matpes_ff": {
         "category": "forcefield",

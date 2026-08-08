@@ -155,7 +155,7 @@ def main():
         "--model-path",
         default=None,
         help="ALIGNN-FF model dir (default: the bundled default_path() model, "
-        "i.e. matpes_smooth)",
+        "i.e. matpes_pbe)",
     )
     p.add_argument(
         "--types",

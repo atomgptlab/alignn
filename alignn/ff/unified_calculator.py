@@ -104,7 +104,7 @@ class AlignnUnifiedConfig(BaseModel):
     """Declarative spec of what the calculator should output."""
 
     # force-field model (energy/forces/stress source)
-    ff_model: str = "matpes_smooth"
+    ff_model: str = "matpes_r2scan"
     energy: bool = True
     forces: bool = True
     stress: bool = True
