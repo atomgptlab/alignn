@@ -506,7 +506,10 @@ def get_train_val_loaders(
             batch_size=batch_size,
             shuffle=False,
             collate_fn=collate_fn,
-            drop_last=True,
+            # Never drop the val tail: with a small val set and a large
+            # batch size, drop_last=True silently empties the loader and
+            # the reported val loss becomes a meaningless 0.
+            drop_last=False,
             num_workers=workers,
             pin_memory=pin_memory,
             use_ddp=use_ddp,

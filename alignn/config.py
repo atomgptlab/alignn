@@ -230,6 +230,19 @@ class TrainingConfig(BaseSettings):
     distributed: bool = False
     data_parallel: bool = False
     n_early_stopping: Optional[int] = None  # typically 50
+    # When True, load the best-validation checkpoint (best_model.pt, or
+    # best_ema_model.pt if it validated better) before the final test
+    # evaluation and prediction writing, instead of the last-epoch
+    # weights. Default False preserves the legacy behavior.
+    eval_best_checkpoint: bool = False
+    # Maintain an exponential moving average of the weights, validated
+    # each epoch on the graph-level loss and saved as best_ema_model.pt.
+    use_ema: bool = False
+    ema_decay: float = 0.999
+    # Training-only RNG seed (weight init, shuffling). When None, falls
+    # back to random_seed. Set this - not random_seed - for seed
+    # replicas, since random_seed also determines the data split.
+    torch_seed: Optional[int] = None
     output_dir: str = os.path.abspath(".")
     use_lmdb: bool = True
     # When True, reuse an existing LMDB cache on disk (fast, but the
