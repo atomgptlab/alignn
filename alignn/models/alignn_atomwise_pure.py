@@ -100,6 +100,11 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     include_pos_deriv: bool = False
     use_cutoff_function: bool = False
     inner_cutoff: float = 3.0
+    # Angle-triplet cutoff: only edges shorter than this form line-graph
+    # (angle) triplets. Must match the value the graph builder uses
+    # (atom_dgl_multigraph default = 3.5) so the TorchScript forward_tensors
+    # line graph is identical to the ASE/training forward(g) line graph.
+    three_body_cutoff: float = 3.5
     stress_multiplier: float = 1.0
     add_reverse_forces: bool = True
     lg_on_fly: bool = True
@@ -592,6 +597,14 @@ class ALIGNNAtomWisePure(nn.Module):
         self.penalty_factor: float = float(config.penalty_factor)
         self.use_zbl: bool = bool(config.use_zbl)
         self.zbl_cutoff: float = float(config.zbl_cutoff)
+        # Smooth-cutoff envelope params, mirrored as instance attributes so the
+        # TorchScript forward_tensors path can apply the SAME cutoff as
+        # forward(g) (otherwise exported/LAMMPS energies are wrong).
+        self.use_cutoff_function: bool = bool(config.use_cutoff_function)
+        self.multiply_cutoff: bool = bool(config.multiply_cutoff)
+        self.inner_cutoff: float = float(config.inner_cutoff)
+        self.exponent: int = int(config.exponent)
+        self.three_body_cutoff: float = float(config.three_body_cutoff)
         self.grad_multiplier: int = int(config.grad_multiplier)
         self.add_reverse_forces: bool = bool(config.add_reverse_forces)
         self.stress_multiplier: float = float(config.stress_multiplier)
@@ -693,21 +706,30 @@ class ALIGNNAtomWisePure(nn.Module):
         )
         bondlength = torch.linalg.vector_norm(r, dim=1)
 
-        # Inline line-graph: connect parent edge A=(u,v) to B=(v,w).
+        # Inline line-graph: connect parent edge A=(u,v) to B=(v,w). Only
+        # edges shorter than three_body_cutoff may form triplets, matching
+        # the graph builder's _line_graph_edges(allowed=...) so this path is
+        # identical to the ASE/training forward(g) line graph.
         E = src.shape[0]
-        order = torch.argsort(src, stable=True)
-        sorted_src = src.index_select(0, order)
+        allowed = bondlength <= self.three_body_cutoff
+        allowed_ids = torch.nonzero(allowed).squeeze(-1)
+
+        sub_src = src.index_select(0, allowed_ids)
+        order = torch.argsort(sub_src, stable=True)
+        sorted_edge_ids = allowed_ids.index_select(0, order)
+        sorted_src = sub_src.index_select(0, order)
+
         node_range = torch.arange(num_nodes, device=src.device)
         bucket_start = torch.searchsorted(sorted_src, node_range)
         bucket_end = torch.searchsorted(sorted_src, node_range, right=True)
 
-        A_v = dst
+        A_ids = allowed_ids
+        A_v = dst.index_select(0, A_ids)
         starts = bucket_start.index_select(0, A_v)
         ends = bucket_end.index_select(0, A_v)
         counts = ends - starts
 
         total = int(counts.sum().item())
-        A_ids = torch.arange(E, device=src.device)
         lg_src = torch.repeat_interleave(A_ids, counts)
         cum = torch.cumsum(counts, dim=0)
         row_start = cum - counts
@@ -715,7 +737,7 @@ class ALIGNNAtomWisePure(nn.Module):
             total, device=src.device
         ) - torch.repeat_interleave(row_start, counts)
         pos_idx = torch.repeat_interleave(starts, counts) + offsets
-        lg_dst = order.index_select(0, pos_idx)
+        lg_dst = sorted_edge_ids.index_select(0, pos_idx)
         lg_num_nodes = E
 
         # Angle cosines (differentiable through r -> positions, lattice).
@@ -727,9 +749,21 @@ class ALIGNNAtomWisePure(nn.Module):
         ) * torch.linalg.vector_norm(r_jk, dim=-1).clamp_min(1e-12)
         h_cos = (num / denom).clamp(-1.0, 1.0)
 
-        # Embeddings.
+        # Embeddings. Apply the smooth cutoff exactly as forward(g) does, so
+        # exported/TorchScript (LAMMPS/OpenMM) energies match the ASE path.
         x = self.atom_embedding(atom_features)
-        y = self.edge_embedding(bondlength)
+        if self.use_cutoff_function:
+            c_off = cutoff_function_based_edges(
+                bondlength,
+                inner_cutoff=self.inner_cutoff,
+                exponent=self.exponent,
+            )
+            if self.multiply_cutoff:
+                y = self.edge_embedding(bondlength) * c_off.unsqueeze(-1)
+            else:
+                y = self.edge_embedding(c_off)
+        else:
+            y = self.edge_embedding(bondlength)
         z = self.angle_embedding(h_cos)
 
         # ALIGNN and GCN layers via tensor-only paths.
