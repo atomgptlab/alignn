@@ -15,7 +15,7 @@ Accepts either:
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 import torch
@@ -110,6 +110,12 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     exponent: int = 5
     penalty_factor: float = 0.5
     penalty_threshold: float = 1.0
+    # ZBL screened-Coulomb short-range repulsion (fixed, analytic, added
+    # after the network so training is unaffected). Guarantees a physical
+    # repulsive wall as atoms approach contact; smoothly switched off by
+    # zbl_cutoff so bonding/bulk properties are untouched.
+    use_zbl: bool = False
+    zbl_cutoff: float = 0.9
     # penalty_factor: float = 0.1
     # penalty_threshold: float = 1.0
     additional_output_features: int = 0
@@ -449,6 +455,37 @@ def cutoff_function_based_edges(
     return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
+def zbl_edge_energy(
+    z_i: torch.Tensor, z_j: torch.Tensor, r: torch.Tensor, r_cut: float
+) -> torch.Tensor:
+    """ZBL screened-Coulomb repulsion summed over edges within ``r_cut``.
+
+    ``z_i``, ``z_j`` are per-edge atomic numbers (float); ``r`` per-edge bond
+    lengths. Returns a scalar energy (0.5 accounts for the two directed edges
+    per pair). Differentiable through ``r`` -> positions, so autograd yields
+    the ZBL forces. Smooth DimeNet(p=4) envelope switches it off at ``r_cut``.
+    """
+    a = 0.46850 / (torch.pow(z_i, 0.23) + torch.pow(z_j, 0.23))
+    x = r / a
+    phi = (
+        0.18175 * torch.exp(-3.19980 * x)
+        + 0.50986 * torch.exp(-0.94229 * x)
+        + 0.28022 * torch.exp(-0.40290 * x)
+        + 0.02817 * torch.exp(-0.20162 * x)
+    )
+    e_pair = 14.399645 * z_i * z_j / r.clamp_min(1e-6) * phi
+    t = (r / r_cut).clamp(0.0, 1.0)
+    p = 4.0
+    env = (
+        1.0
+        - ((p + 1.0) * (p + 2.0) / 2.0) * torch.pow(t, p)
+        + (p * (p + 2.0)) * torch.pow(t, p + 1.0)
+        - (p * (p + 1.0) / 2.0) * torch.pow(t, p + 2.0)
+    )
+    mask = (r < r_cut).to(e_pair.dtype)
+    return 0.5 * (e_pair * env * mask).sum()
+
+
 def _bond_cosines(r_ij: torch.Tensor, r_jk: torch.Tensor) -> torch.Tensor:
     num = -(r_ij * r_jk).sum(dim=-1)
     denom = r_ij.norm(dim=-1) * r_jk.norm(dim=-1)
@@ -553,6 +590,8 @@ class ALIGNNAtomWisePure(nn.Module):
         self.use_penalty: bool = bool(config.use_penalty)
         self.penalty_threshold: float = float(config.penalty_threshold)
         self.penalty_factor: float = float(config.penalty_factor)
+        self.use_zbl: bool = bool(config.use_zbl)
+        self.zbl_cutoff: float = float(config.zbl_cutoff)
         self.grad_multiplier: int = int(config.grad_multiplier)
         self.add_reverse_forces: bool = bool(config.add_reverse_forces)
         self.stress_multiplier: float = float(config.stress_multiplier)
@@ -616,7 +655,14 @@ class ALIGNNAtomWisePure(nn.Module):
         """
         atom_features = self._species_table.index_select(0, atomic_numbers)
         return self.forward_tensors(
-            positions, lattice, atom_features, src, dst, shift, compute_stress
+            positions,
+            lattice,
+            atom_features,
+            src,
+            dst,
+            shift,
+            compute_stress,
+            atomic_numbers,
         )
 
     @torch.jit.export
@@ -629,6 +675,7 @@ class ALIGNNAtomWisePure(nn.Module):
         dst: torch.Tensor,  # (E,) long
         shift: torch.Tensor,  # (E, 3) integer cell offsets (float dtype)
         compute_stress: bool = False,
+        atomic_numbers: Optional[torch.Tensor] = None,  # (N,) for ZBL
     ) -> Dict[str, torch.Tensor]:
         """Single-system forward driven by plain tensors.
 
@@ -708,6 +755,15 @@ class ALIGNNAtomWisePure(nn.Module):
                 torch.zeros_like(bondlength),
             )
             en = en + pen.sum()
+
+        if self.use_zbl and atomic_numbers is not None:
+            z = atomic_numbers.to(bondlength.dtype)
+            en = en + zbl_edge_energy(
+                z.index_select(0, src),
+                z.index_select(0, dst),
+                bondlength,
+                self.zbl_cutoff,
+            )
 
         result: Dict[str, torch.Tensor] = {"energy": en.squeeze()}
 
@@ -813,6 +869,19 @@ class ALIGNNAtomWisePure(nn.Module):
                 torch.zeros_like(bondlength),
             )
             en_out = en_out + penalties.sum()
+
+        if self.use_zbl and ("Z" in g.ndata):
+            zz = g.ndata["Z"].to(bondlength.dtype)
+            e_zbl = zbl_edge_energy(
+                zz.index_select(0, g.src),
+                zz.index_select(0, g.dst),
+                bondlength,
+                self.zbl_cutoff,
+            )
+            en_out = en_out + e_zbl  # total energy -> forces via autograd
+            # ``out`` is the per-atom energy the FF calculator scales by
+            # num_atoms; fold ZBL in so the returned energy matches.
+            out = out + e_zbl / float(g.num_nodes)
 
         atomwise_pred = torch.empty(1, device=r.device)
         if (
