@@ -119,7 +119,10 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     # after the network so training is unaffected). Guarantees a physical
     # repulsive wall as atoms approach contact; smoothly switched off by
     # zbl_cutoff so bonding/bulk properties are untouched.
-    use_zbl: bool = False
+    # None (default) auto-enables ZBL for force-field models
+    # (calculate_gradient=True) and disables it for property/multi-output
+    # models; set explicitly to True/False to override.
+    use_zbl: Optional[bool] = None
     zbl_cutoff: float = 0.9
     # penalty_factor: float = 0.1
     # penalty_threshold: float = 1.0
@@ -595,7 +598,14 @@ class ALIGNNAtomWisePure(nn.Module):
         self.use_penalty: bool = bool(config.use_penalty)
         self.penalty_threshold: float = float(config.penalty_threshold)
         self.penalty_factor: float = float(config.penalty_factor)
-        self.use_zbl: bool = bool(config.use_zbl)
+        # ZBL defaults to on for force fields (calculate_gradient) and off for
+        # property models when use_zbl is left unset (None); explicit
+        # True/False always wins.
+        self.use_zbl: bool = (
+            bool(config.use_zbl)
+            if config.use_zbl is not None
+            else bool(self.config.calculate_gradient)
+        )
         self.zbl_cutoff: float = float(config.zbl_cutoff)
         # Smooth-cutoff envelope params, mirrored as instance attributes so the
         # TorchScript forward_tensors path can apply the SAME cutoff as
