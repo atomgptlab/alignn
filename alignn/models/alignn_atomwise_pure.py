@@ -904,7 +904,14 @@ class ALIGNNAtomWisePure(nn.Module):
             )
             en_out = en_out + penalties.sum()
 
-        if self.use_zbl and ("Z" in g.ndata):
+        # ZBL only applies to energy/force (force-field) models; the guard on
+        # calculate_gradient keeps it a no-op for property / multi-output /
+        # spectra models, which share this class but do not predict energy.
+        if (
+            self.use_zbl
+            and self.config.calculate_gradient
+            and ("Z" in g.ndata)
+        ):
             zz = g.ndata["Z"].to(bondlength.dtype)
             e_zbl = zbl_edge_energy(
                 zz.index_select(0, g.src),
