@@ -44,7 +44,7 @@ from alignn.ff.calculators import (
     ase_to_atoms,
 )
 from alignn.graphs import Graph
-from alignn.pretrained2 import (
+from alignn.pretrained import (
     get_alignn2_model,
     resolve_by_target,
     ALIGNN2_MODELS,
@@ -57,7 +57,7 @@ import json as _json
 
 
 def _prop2_name(friendly, graph):
-    """Resolve a friendly property name to a pretrained2 model key, preferring the
+    """Resolve a friendly property name to a pretrained (ALIGNN 2.0) model key, preferring the
     requested graph. Handles all three registry conventions: a direct model name
     (``elastic_tensor``), ``{name}_{graph}`` (``ir_radius``), and target lookup
     (``formation_energy_peratom`` -> ``..._radius``). Falls back to the other graph
@@ -72,11 +72,11 @@ def _prop2_name(friendly, graph):
     if cands:
         pref = [m for m in cands if m.endswith("_" + graph)]
         return (pref or cands)[0]
-    raise KeyError("No pretrained2 property model for '{}'".format(friendly))
+    raise KeyError("No ALIGNN 2.0 property model for '{}'".format(friendly))
 
 
 def _load_prop2_model(friendly, graph, device):
-    """Load a pure-PyTorch ALIGNN 2.0 property model (pretrained2) for `friendly`
+    """Load a pure-PyTorch ALIGNN 2.0 property model for `friendly`
     on the requested `graph` ("radius"/"knn"). Scalar, spectra (D>1) and tensor
     outputs are all supported. Returns a dict with the model and its own
     graph-construction settings (cutoff/max_neighbors/atom_features)."""
@@ -116,7 +116,7 @@ class AlignnUnifiedConfig(BaseModel):
     # shared knobs
     device: Optional[str] = None
     # property-predictor graph: "radius" (default, FF-compatible) or "knn".
-    # Uses the pure-PyTorch ALIGNN 2.0 models from pretrained2; each carries its
+    # Uses the pure-PyTorch ALIGNN 2.0 models from the ALIGNN 2.0 registry; each carries its
     # own cutoff/max_neighbors from its training config.
     prop_graph: str = "radius"
 
