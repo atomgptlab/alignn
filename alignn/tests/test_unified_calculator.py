@@ -1,10 +1,11 @@
 """Tests for the unified ALIGNN calculator (FF + pure-torch property predictors).
 
-Covers the force field (energy/forces/stress via matpes_smooth default), a scalar
+Covers the force field (energy/forces/stress via matpes_r2scan default), a scalar
 property (formation_energy_peratom), a spectrum (edos, D=300), a tensor
 (elastic_tensor, D=36), the radius/knn graph switch, and config validation.
 Models are downloaded+cached on first use (like the other pretrained tests).
 """
+
 import math
 
 import numpy as np
@@ -29,8 +30,8 @@ def test_unified_ff_scalar_spectrum_tensor():
         stress=True,
         properties=[
             "formation_energy_peratom",  # scalar
-            "edos",                      # spectrum, D=300
-            "elastic_tensor",            # tensor, D=36
+            "edos",  # spectrum, D=300
+            "elastic_tensor",  # tensor, D=36
         ],
     )
     calc = AlignnUnifiedCalculator(cfg)
@@ -61,9 +62,11 @@ def test_unified_ff_scalar_spectrum_tensor():
 
 
 def test_unified_ff_only_default_model():
-    """FF-only path uses the pure-torch matpes_smooth default (no dgl)."""
-    cfg = AlignnUnifiedConfig()  # defaults: energy/forces/stress, no properties
-    assert cfg.ff_model == "matpes_smooth"
+    """FF-only path uses the pure-torch matpes_r2scan default (no dgl)."""
+    cfg = (
+        AlignnUnifiedConfig()
+    )  # defaults: energy/forces/stress, no properties
+    assert cfg.ff_model == "matpes_r2scan"
     calc = AlignnUnifiedCalculator(cfg)
     si = bulk("Si", "diamond", a=5.43)
     si.calc = calc
@@ -73,24 +76,35 @@ def test_unified_ff_only_default_model():
 
 def test_prop_name_resolution_radius_and_knn():
     """Name resolver handles direct names, {name}_{graph}, and graph fallback."""
-    assert _prop2_name("formation_energy_peratom", "radius") == \
-        "formation_energy_peratom_radius"
-    assert _prop2_name("formation_energy_peratom", "knn") == \
-        "formation_energy_peratom_knn"
-    assert _prop2_name("elastic_tensor", "radius") == "elastic_tensor"  # direct
-    assert _prop2_name("ir", "knn") == "ir_knn"                          # {name}_{graph}
-    assert _prop2_name("raman", "radius") == "raman_knn"                 # knn-only fallback
+    assert (
+        _prop2_name("formation_energy_peratom", "radius")
+        == "formation_energy_peratom_radius"
+    )
+    assert (
+        _prop2_name("formation_energy_peratom", "knn")
+        == "formation_energy_peratom_knn"
+    )
+    assert (
+        _prop2_name("elastic_tensor", "radius") == "elastic_tensor"
+    )  # direct
+    assert _prop2_name("ir", "knn") == "ir_knn"  # {name}_{graph}
+    assert _prop2_name("raman", "radius") == "raman_knn"  # knn-only fallback
 
 
 def test_unified_knn_switch():
     """prop_graph='knn' loads the knn property variant."""
     cfg = AlignnUnifiedConfig(
-        energy=True, forces=True, stress=True,
-        prop_graph="knn", properties=["formation_energy_peratom"],
+        energy=True,
+        forces=True,
+        stress=True,
+        prop_graph="knn",
+        properties=["formation_energy_peratom"],
     )
     calc = AlignnUnifiedCalculator(cfg)
-    assert calc._prop_models["formation_energy_peratom"]["name"] == \
-        "formation_energy_peratom_knn"
+    assert (
+        calc._prop_models["formation_energy_peratom"]["name"]
+        == "formation_energy_peratom_knn"
+    )
     si = bulk("Si", "diamond", a=5.43)
     si.calc = calc
     si.get_potential_energy()

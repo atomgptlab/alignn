@@ -207,8 +207,9 @@ def get_figshare_model_prop(
 
 
 def default_path():
-    """Get default model path (ALIGNN 2.0 matpes_smooth, 2/2/128 smooth cutoff)."""
-    dpath = get_figshare_model_ff(model_name="matpes_smooth")
+    """Get default model path (ALIGNN 2.0 matpes_r2scan, 2/2/128 smooth)."""
+    dpath = get_figshare_model_ff(model_name="matpes_r2scan")
+    # dpath = get_figshare_model_ff(model_name="matpes_pbe")  # previous default
     # dpath = get_figshare_model_ff(model_name="mps")  # previous default
     # dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
     # dpath = get_figshare_model_ff(model_name="v5.27.2024")
