@@ -326,7 +326,20 @@ def train_dgl(
         ema_state = None
         if getattr(config, "use_ema", False):
             ema_state = _ema_init(_unwrap(net))
-        criterion = nn.L1Loss()
+        # Honor config.criterion (historically this was hardcoded to L1Loss
+        # regardless of the config value; every run before 2026-08-18 trained
+        # with L1). "wmse" is target-intensity-weighted MSE: bins carrying
+        # spectral weight are up-weighted to counter amplitude damping on
+        # sparse multi-output targets.
+        def _wmse(pred, target, _alpha=10.0):
+            w = 1.0 + _alpha * target.detach().abs()
+            return (w * (pred - target) ** 2).mean()
+
+        criterion = {
+            "l1": nn.L1Loss(),
+            "mse": nn.MSELoss(),
+            "wmse": _wmse,
+        }.get(config.criterion, nn.L1Loss())
         if classification:
             criterion = nn.NLLLoss()
         # NOTE: optimizer / scheduler intentionally NOT recreated here.
