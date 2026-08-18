@@ -175,11 +175,13 @@ def write_shard(rows, columns, path, fmt):
 
 
 def shard_path(output_dir, idx, fmt):
+    """Return the output path for shard ``idx`` in the given format."""
     ext = "parquet" if fmt == "parquet" else "jsonl.gz"
     return os.path.join(output_dir, "shard_%05d.%s" % (idx, ext))
 
 
 def screen(args):
+    """Run bulk multi-model property screening over the input structures."""
     device = torch.device(args.device)
     model_dirs = resolve_model_dirs(args.manifest, args.models)
     check_graph_compat(model_dirs, args)
@@ -293,6 +295,7 @@ def screen(args):
 
 
 def main():
+    """Parse CLI arguments and run the screening entry point."""
     parser = argparse.ArgumentParser(
         description="Bulk multi-model property screening (ALIGNN DB)."
     )
