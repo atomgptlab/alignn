@@ -326,6 +326,7 @@ def train_dgl(
         ema_state = None
         if getattr(config, "use_ema", False):
             ema_state = _ema_init(_unwrap(net))
+
         # Honor config.criterion (historically this was hardcoded to L1Loss
         # regardless of the config value; every run before 2026-08-18 trained
         # with L1). "wmse" is target-intensity-weighted MSE: bins carrying
