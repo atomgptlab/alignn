@@ -461,6 +461,25 @@ def get_prediction_pure(
     out = model([g, lg, lat])
     out_data = out["out"] if isinstance(out, dict) else out
     out_data = out_data.detach().cpu().numpy().flatten().tolist()
+    atomwise_features = int(
+        (config.get("model", {}) or {}).get("atomwise_output_features") or 0
+    )
+    if (
+        atomwise_features > 0
+        and isinstance(out, dict)
+        and out.get("atomwise_pred") is not None
+    ):
+        # per-atom head (e.g. charges, magnetic moments): return both the
+        # graph-level output and the (num_atoms, features) per-atom block
+        atomwise = (
+            out["atomwise_pred"]
+            .detach()
+            .cpu()
+            .numpy()
+            .reshape(atoms.num_atoms, -1)
+            .tolist()
+        )
+        return {"out": out_data, "atomwise_pred": atomwise}
     return out_data
 
 

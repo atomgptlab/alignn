@@ -204,6 +204,42 @@ Not carried over from `alignn_atomwise` (config fields accepted but ignored):
 - `include_pos_deriv`
 - Some `extra_features` code paths — experimental in the DGL model too.
 
+### Running the legacy DGL backend for comparisons
+
+DGL wheels lag PyTorch/CUDA releases and do not support `sm_120`-class GPUs,
+so the DGL backend needs its own environment on older hardware
+(A100/H100-class partitions):
+
+```bash
+conda create -n alignn_dgl python=3.10
+conda activate alignn_dgl
+pip install torch==2.4.* --index-url https://download.pytorch.org/whl/cu121
+pip install dgl -f https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html
+pip install -e .   # this repository; DGL is imported lazily
+```
+
+`alignn/scripts/train_all_jv_dgl.py` generates matched DGL/pure-torch run
+pairs for the 27 dft_3d property benchmarks (one shared `id_prop.json` per
+property, identical configs except `neighbor_strategy`/`model.name`);
+`alignn/scripts/collect_jv_results.py` aggregates the test MAEs and can
+assert split identity across backends (`--check_splits`).
+
+### Bulk multi-model screening (ALIGNN DB)
+
+`alignn/screen.py` (installed as a console script) applies many trained
+pure-torch property models to a whole database, building each batch's graph
+once and running every model on it. Models come from
+`alignn/scripts/alignn_db_manifest.json` (figshare keys or local run dirs);
+input is a jarvis figshare dataset (`--dataset alex_pbe_hull`,
+`alex_pbe_3d_all`, ...) or a local `--input` JSON/JSONL of `{id, atoms}`
+records. Output is sharded parquet / gzipped JSONL with atomic writes;
+re-running skips completed shards (resume). Smoke test:
+
+```bash
+python alignn/screen.py --dataset alex_pbe_hull --limit 100 \
+    --models formation_energy_peratom,mbj_bandgap --device cpu
+```
+
 When the pure model is selected, the training pipeline automatically:
 
 - Uses `alignn/pure_lmdb_dataset.py` (pickles `TorchGraph` objects, no DGL).
