@@ -1,672 +1,1572 @@
-#!/usr/bin/env python
+"""ALIGNN 2.0 pretrained-model registry (glossary).
 
-"""Module to download and load pre-trained ALIGNN models."""
-import requests
+Analogous to :mod:`jarvis.db.figshare`: a single dict maps a model name to its
+Figshare artifacts and metadata, and :func:`get_alignn2_model` downloads
+(and caches) the ``config.json``, ``best_model.pt``, and
+``ids_train_val_test.json`` for that model.
+
+All models live in the Figshare **ALIGNN2** project
+(https://figshare.com/projects/ALIGNN2, id ``279395``). Each variant (e.g.
+``formation_energy_peratom_radius`` and ``..._knn``) is its OWN article holding
+ONE flat zip (best_model.pt + config.json + ids_train_val_test.json) with its
+own ``url`` (``https://ndownloader.figshare.com/files/<id>``) -- mirroring the
+per-model download URLs in the original ``alignn/pretrained.py``.
+
+Note: Figshare *draft* files are not publicly downloadable; the ``url`` loader
+activates once the article is published (token needed meanwhile).
+"""
+
 import os
 import zipfile
-from tqdm import tqdm
-from alignn.models.alignn import ALIGNN, ALIGNNConfig
-from torch.utils.data import DataLoader
-import tempfile
-import torch
-import sys
-import json
-import argparse
-from jarvis.core.atoms import Atoms
-from alignn.graphs import Graph
-from jarvis.db.jsonutils import loadjson, dumpjson
-import pandas as pd
-from alignn.dataset import get_torch_dataset
-import numpy as np
-from alignn.models.alignn_atomwise import (
-    ALIGNNAtomWise,
-    ALIGNNAtomWiseConfig,
+import requests
+
+FIGSHARE_PROJECT_ID = 279395
+FIGSHARE_PROJECT_URL = "https://figshare.com/projects/ALIGNN2/{}".format(
+    FIGSHARE_PROJECT_ID
 )
-from jarvis.core.utils import get_cache_dir
-# from jarvis.core.graphs import Graph
 
-tqdm.pandas()
-
-"""
-Name of the model, figshare link, number of outputs,
-extra config params (optional)
-"""
-# See also, alignn/ff/ff.py
-# Both alignn and alignn_atomwise
-# models are shared
-
-# See: alignn/ff/all_models_alignn.json
-# to load as a calculator
-all_models = {
-    "jv_formation_energy_peratom_alignn": [
-        "https://ndownloader.figshare.com/files/31458679",
-        1,
-    ],
-    "jv_optb88vdw_total_energy_alignn": [
-        "https://ndownloader.figshare.com/files/31459642",
-        1,
-    ],
-    "jv_optb88vdw_bandgap_alignn": [
-        "https://ndownloader.figshare.com/files/31459636",
-        1,
-    ],
-    "jv_mbj_bandgap_alignn": [
-        "https://ndownloader.figshare.com/files/31458694",
-        1,
-    ],
-    "jv_spillage_alignn": [
-        "https://ndownloader.figshare.com/files/31458736",
-        1,
-    ],
-    "jv_slme_alignn": ["https://ndownloader.figshare.com/files/31458727", 1],
-    "jv_bulk_modulus_kv_alignn": [
-        "https://ndownloader.figshare.com/files/31458649",
-        1,
-    ],
-    "jv_shear_modulus_gv_alignn": [
-        "https://ndownloader.figshare.com/files/31458724",
-        1,
-    ],
-    "jv_n-Seebeck_alignn": [
-        "https://ndownloader.figshare.com/files/31458718",
-        1,
-    ],
-    "jv_n-powerfact_alignn": [
-        "https://ndownloader.figshare.com/files/31458712",
-        1,
-    ],
-    "intermat_cbm": [
-        "https://ndownloader.figshare.com/files/45392908",
-        1,
-    ],
-    "intermat_vbm": [
-        "https://ndownloader.figshare.com/files/45392914",
-        1,
-    ],
-    "intermat_phi": [
-        "https://ndownloader.figshare.com/files/45392911",
-        1,
-    ],
-    "jv_magmom_oszicar_alignn": [
-        "https://ndownloader.figshare.com/files/31458685",
-        1,
-    ],
-    "jv_kpoint_length_unit_alignn": [
-        "https://ndownloader.figshare.com/files/31458682",
-        1,
-    ],
-    "jv_avg_elec_mass_alignn": [
-        "https://ndownloader.figshare.com/files/31458643",
-        1,
-    ],
-    "jv_avg_hole_mass_alignn": [
-        "https://ndownloader.figshare.com/files/31458646",
-        1,
-    ],
-    "jv_epsx_alignn": ["https://ndownloader.figshare.com/files/31458667", 1],
-    "jv_mepsx_alignn": ["https://ndownloader.figshare.com/files/31458703", 1],
-    "jv_max_efg_alignn": [
-        "https://ndownloader.figshare.com/files/31458691",
-        1,
-    ],
-    "jv_ehull_alignn": ["https://ndownloader.figshare.com/files/31458658", 1],
-    "jv_dfpt_piezo_max_dielectric_alignn": [
-        "https://ndownloader.figshare.com/files/31458652",
-        1,
-    ],
-    "jv_dfpt_piezo_max_dij_alignn": [
-        "https://ndownloader.figshare.com/files/31458655",
-        1,
-    ],
-    "jv_exfoliation_energy_alignn": [
-        "https://ndownloader.figshare.com/files/31458676",
-        1,
-    ],
-    "jv_supercon_tc_alignn": [
-        "https://ndownloader.figshare.com/files/38789199",
-        1,
-    ],
-    "jv_supercon_edos_alignn": [
-        "https://ndownloader.figshare.com/files/39946300",
-        1,
-    ],
-    "jv_supercon_debye_alignn": [
-        "https://ndownloader.figshare.com/files/39946297",
-        1,
-    ],
-    "jv_supercon_a2F_alignn": [
-        "https://ndownloader.figshare.com/files/38801886",
-        100,
-    ],
-    "mp_e_form_alignn": [
-        "https://ndownloader.figshare.com/files/31458811",
-        1,
-    ],
-    "mp_gappbe_alignn": [
-        "https://ndownloader.figshare.com/files/31458814",
-        1,
-    ],
-    "tinnet_O_alignn": ["https://ndownloader.figshare.com/files/41962800", 1],
-    "tinnet_N_alignn": ["https://ndownloader.figshare.com/files/41962797", 1],
-    "tinnet_OH_alignn": ["https://ndownloader.figshare.com/files/41962803", 1],
-    "AGRA_O_alignn": ["https://ndownloader.figshare.com/files/41966619", 1],
-    "AGRA_OH_alignn": ["https://ndownloader.figshare.com/files/41966610", 1],
-    "AGRA_CHO_alignn": ["https://ndownloader.figshare.com/files/41966643", 1],
-    "AGRA_CO_alignn": ["https://ndownloader.figshare.com/files/41966634", 1],
-    "AGRA_COOH_alignn": ["https://ndownloader.figshare.com/41966646", 1],
-    "qm9_U0_alignn": ["https://ndownloader.figshare.com/files/31459054", 1],
-    "qm9_U_alignn": ["https://ndownloader.figshare.com/files/31459051", 1],
-    "qm9_alpha_alignn": ["https://ndownloader.figshare.com/files/31459027", 1],
-    "qm9_gap_alignn": ["https://ndownloader.figshare.com/files/31459036", 1],
-    "qm9_G_alignn": ["https://ndownloader.figshare.com/files/31459033", 1],
-    "qm9_HOMO_alignn": ["https://ndownloader.figshare.com/files/31459042", 1],
-    "qm9_LUMO_alignn": ["https://ndownloader.figshare.com/files/31459045", 1],
-    "qm9_ZPVE_alignn": ["https://ndownloader.figshare.com/files/31459057", 1],
-    "hmof_co2_absp_alignn": [
-        "https://ndownloader.figshare.com/files/31459198",
-        5,
-    ],
-    "hmof_max_co2_adsp_alignn": [
-        "https://ndownloader.figshare.com/files/31459207",
-        1,
-    ],
-    "hmof_surface_area_m2g_alignn": [
-        "https://ndownloader.figshare.com/files/31459222",
-        1,
-    ],
-    "hmof_surface_area_m2cm3_alignn": [
-        "https://ndownloader.figshare.com/files/31459219",
-        1,
-    ],
-    "hmof_pld_alignn": ["https://ndownloader.figshare.com/files/31459216", 1],
-    "hmof_lcd_alignn": ["https://ndownloader.figshare.com/files/31459201", 1],
-    "hmof_void_fraction_alignn": [
-        "https://ndownloader.figshare.com/files/31459228",
-        1,
-    ],
-    "ocp2020_all": ["https://ndownloader.figshare.com/files/41411025", 1],
-    "ocp2020_100k": ["https://ndownloader.figshare.com/files/41967303", 1],
-    "ocp2020_10k": ["https://ndownloader.figshare.com/files/41967330", 1],
-    "jv_pdos_alignn": [
-        "https://ndownloader.figshare.com/files/36757005",
-        66,
-        {"alignn_layers": 6, "gcn_layers": 6},
-    ],
-    "jv_raman_alignn": [
-        "https://ndownloader.figshare.com/files/62805487",
-        200,
-    ],
+# --- registry -----------------------------------------------------------------
+# name -> metadata. Each entry carries its own `url` (one flat zip per variant).
+ALIGNN2_MODELS = {
+    "alex_supercon_Tc": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "alex_Tc",
+        "unit": "",
+        "test_mae": 0.883,
+        "figshare_article_id": 33135179,
+        "url": "https://ndownloader.figshare.com/files/67163582",
+        "description": "Alexandria superconductor Tc (radius).",
+    },
+    "alex_supercon_debye": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "alex_debye",
+        "unit": "",
+        "test_mae": 11.33,
+        "figshare_article_id": 33135185,
+        "url": "https://ndownloader.figshare.com/files/67163588",
+        "description": "Alexandria superconductor debye (radius).",
+    },
+    "alex_supercon_dosef": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "alex_dosef",
+        "unit": "",
+        "test_mae": 0.821,
+        "figshare_article_id": 33135182,
+        "url": "https://ndownloader.figshare.com/files/67163585",
+        "description": "Alexandria superconductor dosef (radius).",
+    },
+    "alex_supercon_la": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "alex_la",
+        "unit": "",
+        "test_mae": 0.0707,
+        "figshare_article_id": 33135188,
+        "url": "https://ndownloader.figshare.com/files/67163591",
+        "description": "Alexandria superconductor la (radius).",
+    },
+    "alex_supercon_wlog": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "alex_wlog",
+        "unit": "",
+        "test_mae": 20.31,
+        "figshare_article_id": 33135191,
+        "url": "https://ndownloader.figshare.com/files/67163597",
+        "description": "Alexandria superconductor wlog (radius).",
+    },
+    "avg_elec_mass_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "avg_elec_mass",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33134975,
+        "url": "https://ndownloader.figshare.com/files/67163339",
+        "description": "JARVIS-DFT avg_elec_mass (radius graph).",
+    },
+    "avg_hole_mass_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "avg_hole_mass",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33134981,
+        "url": "https://ndownloader.figshare.com/files/67163345",
+        "description": "JARVIS-DFT avg_hole_mass (radius graph).",
+    },
+    "bulk_modulus_kv_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "bulk_modulus_kv",
+        "unit": "",
+        "test_mae": 9.8854,
+        "figshare_article_id": 33134987,
+        "url": "https://ndownloader.figshare.com/files/67163351",
+        "description": "JARVIS-DFT bulk_modulus_kv (radius graph).",
+    },
+    "c2db_gap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "gap",
+        "unit": "",
+        "test_mae": 0.0971,
+        "figshare_article_id": 33135236,
+        "url": "https://ndownloader.figshare.com/files/67163642",
+        "description": "c2db gap (radius).",
+    },
+    "dfpt_piezo_max_dielectric_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "dfpt_piezo_max_dielectric",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33134993,
+        "url": "https://ndownloader.figshare.com/files/67163357",
+        "description": "JARVIS-DFT dfpt_piezo_max_dielectric (radius graph).",
+    },
+    "dfpt_piezo_max_dij_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "dfpt_piezo_max_dij",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33134999,
+        "url": "https://ndownloader.figshare.com/files/67163363",
+        "description": "JARVIS-DFT dfpt_piezo_max_dij (radius graph).",
+    },
+    "ehull_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "ehull",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135005,
+        "url": "https://ndownloader.figshare.com/files/67163369",
+        "description": "JARVIS-DFT ehull (radius graph).",
+    },
+    "encut_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "encut",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135011,
+        "url": "https://ndownloader.figshare.com/files/67163375",
+        "description": "JARVIS-DFT encut (radius graph).",
+    },
+    "epsx_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "epsx",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135017,
+        "url": "https://ndownloader.figshare.com/files/67163381",
+        "description": "JARVIS-DFT epsx (radius graph).",
+    },
+    "epsy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "epsy",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135023,
+        "url": "https://ndownloader.figshare.com/files/67163387",
+        "description": "JARVIS-DFT epsy (radius graph).",
+    },
+    "epsz_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "epsz",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135029,
+        "url": "https://ndownloader.figshare.com/files/67163393",
+        "description": "JARVIS-DFT epsz (radius graph).",
+    },
+    "exfoliation_energy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "exfoliation_energy",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135041,
+        "url": "https://ndownloader.figshare.com/files/67163405",
+        "description": "JARVIS-DFT exfoliation_energy (radius graph).",
+    },
+    "formation_energy_peratom_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "formation_energy_peratom",
+        "unit": "",
+        "test_mae": 0.0316,
+        "figshare_article_id": 33135047,
+        "url": "https://ndownloader.figshare.com/files/67163411",
+        "description": "JARVIS-DFT formation_energy_peratom (radius graph).",
+    },
+    "halide_peroskites_HSE_decomp_energy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "HSE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0233,
+        "figshare_article_id": 33135434,
+        "url": "https://ndownloader.figshare.com/files/67164215",
+        "description": "halide_peroskites HSE_decomp_energy (radius).",
+    },
+    "halide_peroskites_HSE_gap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "HSE_gap",
+        "unit": "",
+        "test_mae": 0.1397,
+        "figshare_article_id": 33135401,
+        "url": "https://ndownloader.figshare.com/files/67164101",
+        "description": "halide_peroskites HSE_gap (radius).",
+    },
+    "halide_peroskites_PBE_decomp_energy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "PBE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0265,
+        "figshare_article_id": 33135425,
+        "url": "https://ndownloader.figshare.com/files/67164152",
+        "description": "halide_peroskites PBE_decomp_energy (radius).",
+    },
+    "halide_peroskites_PBE_gap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "PBE_gap",
+        "unit": "",
+        "test_mae": 0.101,
+        "figshare_article_id": 33135395,
+        "url": "https://ndownloader.figshare.com/files/67164095",
+        "description": "halide_peroskites PBE_gap (radius).",
+    },
+    "halide_peroskites_Ref_ind_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "Ref_ind",
+        "unit": "",
+        "test_mae": 0.0127,
+        "figshare_article_id": 33135416,
+        "url": "https://ndownloader.figshare.com/files/67164140",
+        "description": "halide_peroskites Ref_ind (radius).",
+    },
+    "kpoint_length_unit_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "kpoint_length_unit",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135053,
+        "url": "https://ndownloader.figshare.com/files/67163420",
+        "description": "JARVIS-DFT kpoint_length_unit (radius graph).",
+    },
+    "magmom_oszicar_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "magmom_oszicar",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135059,
+        "url": "https://ndownloader.figshare.com/files/67163426",
+        "description": "JARVIS-DFT magmom_oszicar (radius graph).",
+    },
+    "max_efg_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "max_efg",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135065,
+        "url": "https://ndownloader.figshare.com/files/67163450",
+        "description": "JARVIS-DFT max_efg (radius graph).",
+    },
+    "mbj_bandgap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "mbj_bandgap",
+        "unit": "",
+        "test_mae": 0.2721,
+        "figshare_article_id": 33135071,
+        "url": "https://ndownloader.figshare.com/files/67163456",
+        "description": "JARVIS-DFT mbj_bandgap (radius graph).",
+    },
+    "mepsx_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "mepsx",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135077,
+        "url": "https://ndownloader.figshare.com/files/67163462",
+        "description": "JARVIS-DFT mepsx (radius graph).",
+    },
+    "mepsy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "mepsy",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135083,
+        "url": "https://ndownloader.figshare.com/files/67163468",
+        "description": "JARVIS-DFT mepsy (radius graph).",
+    },
+    "mepsz_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "mepsz",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135089,
+        "url": "https://ndownloader.figshare.com/files/67163474",
+        "description": "JARVIS-DFT mepsz (radius graph).",
+    },
+    "mxene275_formation_energy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "formation_energy",
+        "unit": "eV/atom",
+        "test_mae": 0.0348,
+        "figshare_article_id": 33135221,
+        "url": "https://ndownloader.figshare.com/files/67163627",
+        "description": "mxene275 formation energy (radius).",
+    },
+    "n_Seebeck_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "n_Seebeck",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135095,
+        "url": "https://ndownloader.figshare.com/files/67163480",
+        "description": "JARVIS-DFT n_Seebeck (radius graph).",
+    },
+    "n_powerfact_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "n_powerfact",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135101,
+        "url": "https://ndownloader.figshare.com/files/67163486",
+        "description": "JARVIS-DFT n_powerfact (radius graph).",
+    },
+    "omdb_bandgap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "bandgap",
+        "unit": "",
+        "test_mae": 0.2428,
+        "figshare_article_id": 33135329,
+        "url": "https://ndownloader.figshare.com/files/67163978",
+        "description": "omdb bandgap (radius).",
+    },
+    "optb88vdw_bandgap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "optb88vdw_bandgap",
+        "unit": "",
+        "test_mae": 0.1314,
+        "figshare_article_id": 33135107,
+        "url": "https://ndownloader.figshare.com/files/67163492",
+        "description": "JARVIS-DFT optb88vdw_bandgap (radius graph).",
+    },
+    "optb88vdw_total_energy_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "optb88vdw_total_energy",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135113,
+        "url": "https://ndownloader.figshare.com/files/67163501",
+        "description": "JARVIS-DFT optb88vdw_total_energy (radius graph).",
+    },
+    "pdbbind_binding_affinity_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "binding_affinity",
+        "unit": "",
+        "test_mae": 1.5833,
+        "figshare_article_id": 33135335,
+        "url": "https://ndownloader.figshare.com/files/67163984",
+        "description": "pdbbind binding_affinity (radius).",
+    },
+    "polymer_genome_gga_gap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "gga_gap",
+        "unit": "",
+        "test_mae": 0.2274,
+        "figshare_article_id": 33135230,
+        "url": "https://ndownloader.figshare.com/files/67163636",
+        "description": "polymer_genome gga_gap (radius).",
+    },
+    "shear_modulus_gv_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "shear_modulus_gv",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135119,
+        "url": "https://ndownloader.figshare.com/files/67163507",
+        "description": "JARVIS-DFT shear_modulus_gv (radius graph).",
+    },
+    "slme_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "slme",
+        "unit": "",
+        "test_mae": 4.4929,
+        "figshare_article_id": 33135125,
+        "url": "https://ndownloader.figshare.com/files/67163516",
+        "description": "JARVIS-DFT slme (radius graph).",
+    },
+    "snumat_Band_gap_HSE_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "Band_gap_HSE",
+        "unit": "",
+        "test_mae": 0.368,
+        "figshare_article_id": 33135974,
+        "url": "https://ndownloader.figshare.com/files/67166069",
+        "description": "snumat Band_gap_HSE (radius).",
+    },
+    "spillage_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "spillage",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135131,
+        "url": "https://ndownloader.figshare.com/files/67163522",
+        "description": "JARVIS-DFT spillage (radius graph).",
+    },
+    "tc_supercon_hydride_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "Tc_supercon_hydride",
+        "unit": "K",
+        "test_mae": 10.06,
+        "figshare_article_id": 33135215,
+        "url": "https://ndownloader.figshare.com/files/67163621",
+        "description": "Tc_supercon_hydride (radius, retrained pure-torch).",
+    },
+    "tc_supercon_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "Tc_supercon",
+        "unit": "",
+        "test_mae": 1.637,
+        "figshare_article_id": 33135209,
+        "url": "https://ndownloader.figshare.com/files/67163615",
+        "description": "Tc_supercon (radius).",
+    },
+    "thermal_cond_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "ltc",
+        "unit": "",
+        "test_mae": 0.386,
+        "figshare_article_id": 33135194,
+        "url": "https://ndownloader.figshare.com/files/67163600",
+        "description": "Lattice thermal cond. log10(kL) (radius).",
+    },
+    "twod_matpd_bandgap_radius": {
+        "category": "radius",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "bandgap",
+        "unit": "",
+        "test_mae": 0.3802,
+        "figshare_article_id": 33135242,
+        "url": "https://ndownloader.figshare.com/files/67163648",
+        "description": "twod_matpd bandgap (radius).",
+    },
+    "alex_supercon_Tc_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "alex_Tc",
+        "unit": "K",
+        "test_mae": 0.864,
+        "figshare_article_id": 33217413,
+        "url": "https://ndownloader.figshare.com/files/67452759",
+        "description": "Alexandria superconductor Tc (kNN).",
+    },
+    "alex_supercon_debye_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "alex_debye",
+        "unit": "K",
+        "test_mae": 10.68,
+        "figshare_article_id": 33217422,
+        "url": "https://ndownloader.figshare.com/files/67452771",
+        "description": "Alexandria superconductor Debye temperature (kNN).",
+    },
+    "alex_supercon_dosef_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "alex_dosef",
+        "unit": "",
+        "test_mae": 0.791,
+        "figshare_article_id": 33217419,
+        "url": "https://ndownloader.figshare.com/files/67452762",
+        "description": "Alexandria superconductor N(E_F) (kNN).",
+    },
+    "alex_supercon_la_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "alex_la",
+        "unit": "",
+        "test_mae": 0.0679,
+        "figshare_article_id": 33217428,
+        "url": "https://ndownloader.figshare.com/files/67452774",
+        "description": "Alexandria superconductor lambda (kNN).",
+    },
+    "alex_supercon_wlog_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "alex_wlog",
+        "unit": "K",
+        "test_mae": 20.08,
+        "figshare_article_id": 33217431,
+        "url": "https://ndownloader.figshare.com/files/67452777",
+        "description": "Alexandria superconductor omega_log (kNN).",
+    },
+    "avg_elec_mass_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "avg_elec_mass",
+        "unit": "",
+        "test_mae": 0.081,
+        "figshare_article_id": 33134978,
+        "url": "https://ndownloader.figshare.com/files/67163342",
+        "description": "JARVIS-DFT avg_elec_mass (knn graph).",
+    },
+    "avg_hole_mass_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "avg_hole_mass",
+        "unit": "",
+        "test_mae": 0.124,
+        "figshare_article_id": 33134984,
+        "url": "https://ndownloader.figshare.com/files/67163348",
+        "description": "JARVIS-DFT avg_hole_mass (knn graph).",
+    },
+    "bulk_modulus_kv_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "bulk_modulus_kv",
+        "unit": "",
+        "test_mae": 9.302,
+        "figshare_article_id": 33134990,
+        "url": "https://ndownloader.figshare.com/files/67163354",
+        "description": "JARVIS-DFT bulk_modulus_kv (knn graph).",
+    },
+    "c2db_gap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "gap",
+        "unit": "",
+        "test_mae": 0.0802,
+        "figshare_article_id": 33135239,
+        "url": "https://ndownloader.figshare.com/files/67163645",
+        "description": "c2db gap (knn).",
+    },
+    "dfpt_piezo_max_dielectric_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "dfpt_piezo_max_dielectric",
+        "unit": "",
+        "test_mae": 24.3052,
+        "figshare_article_id": 33134996,
+        "url": "https://ndownloader.figshare.com/files/67163360",
+        "description": "JARVIS-DFT dfpt_piezo_max_dielectric (knn graph).",
+    },
+    "dfpt_piezo_max_dij_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "dfpt_piezo_max_dij",
+        "unit": "",
+        "test_mae": 12.4983,
+        "figshare_article_id": 33135002,
+        "url": "https://ndownloader.figshare.com/files/67163366",
+        "description": "JARVIS-DFT dfpt_piezo_max_dij (knn graph).",
+    },
+    "ehull_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "ehull",
+        "unit": "",
+        "test_mae": 0.059,
+        "figshare_article_id": 33135008,
+        "url": "https://ndownloader.figshare.com/files/67163372",
+        "description": "JARVIS-DFT ehull (knn graph).",
+    },
+    "encut_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "encut",
+        "unit": "",
+        "test_mae": 128.0826,
+        "figshare_article_id": 33135014,
+        "url": "https://ndownloader.figshare.com/files/67163378",
+        "description": "JARVIS-DFT encut (knn graph).",
+    },
+    "epsx_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "epsx",
+        "unit": "",
+        "test_mae": 20.1393,
+        "figshare_article_id": 33135020,
+        "url": "https://ndownloader.figshare.com/files/67163384",
+        "description": "JARVIS-DFT epsx (knn graph).",
+    },
+    "epsy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "epsy",
+        "unit": "",
+        "test_mae": 19.8292,
+        "figshare_article_id": 33135026,
+        "url": "https://ndownloader.figshare.com/files/67163390",
+        "description": "JARVIS-DFT epsy (knn graph).",
+    },
+    "epsz_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "epsz",
+        "unit": "",
+        "test_mae": 19.4531,
+        "figshare_article_id": 33135032,
+        "url": "https://ndownloader.figshare.com/files/67163396",
+        "description": "JARVIS-DFT epsz (knn graph).",
+    },
+    "exfoliation_energy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "exfoliation_energy",
+        "unit": "",
+        "test_mae": 37.6285,
+        "figshare_article_id": 33135044,
+        "url": "https://ndownloader.figshare.com/files/67163408",
+        "description": "JARVIS-DFT exfoliation_energy (knn graph).",
+    },
+    "formation_energy_peratom_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "formation_energy_peratom",
+        "unit": "",
+        "test_mae": 0.0307,
+        "figshare_article_id": 33135050,
+        "url": "https://ndownloader.figshare.com/files/67163414",
+        "description": "JARVIS-DFT formation_energy_peratom (knn graph).",
+    },
+    "halide_peroskites_HSE_decomp_energy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "HSE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0233,
+        "figshare_article_id": 33135437,
+        "url": "https://ndownloader.figshare.com/files/67164218",
+        "description": "halide_peroskites HSE_decomp_energy (knn).",
+    },
+    "halide_peroskites_HSE_gap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "HSE_gap",
+        "unit": "",
+        "test_mae": 0.1383,
+        "figshare_article_id": 33135404,
+        "url": "https://ndownloader.figshare.com/files/67164104",
+        "description": "halide_peroskites HSE_gap (knn).",
+    },
+    "halide_peroskites_PBE_decomp_energy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "PBE_decomp_energy",
+        "unit": "",
+        "test_mae": 0.0273,
+        "figshare_article_id": 33135428,
+        "url": "https://ndownloader.figshare.com/files/67164155",
+        "description": "halide_peroskites PBE_decomp_energy (knn).",
+    },
+    "halide_peroskites_PBE_gap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "PBE_gap",
+        "unit": "",
+        "test_mae": 0.0867,
+        "figshare_article_id": 33135398,
+        "url": "https://ndownloader.figshare.com/files/67164098",
+        "description": "halide_peroskites PBE_gap (knn).",
+    },
+    "halide_peroskites_Ref_ind_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "Ref_ind",
+        "unit": "",
+        "test_mae": 0.0127,
+        "figshare_article_id": 33135419,
+        "url": "https://ndownloader.figshare.com/files/67164143",
+        "description": "halide_peroskites Ref_ind (knn).",
+    },
+    "hmof_co2": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "hmof_co2",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135173,
+        "url": "https://ndownloader.figshare.com/files/67163576",
+        "description": "hMOF CO2 uptake (kNN).",
+    },
+    "hmof_co2_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "co2_uptake",
+        "unit": "mol/kg",
+        "test_mae": 0.4687,
+        "figshare_article_id": 33137036,
+        "url": "https://ndownloader.figshare.com/files/67174418",
+        "description": "hMOF CO2 uptake (knn graph, epoch-99).",
+    },
+    "kpoint_length_unit_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "kpoint_length_unit",
+        "unit": "",
+        "test_mae": 9.342,
+        "figshare_article_id": 33135056,
+        "url": "https://ndownloader.figshare.com/files/67163423",
+        "description": "JARVIS-DFT kpoint_length_unit (knn graph).",
+    },
+    "magmom_oszicar_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "magmom_oszicar",
+        "unit": "",
+        "test_mae": 0.2567,
+        "figshare_article_id": 33135062,
+        "url": "https://ndownloader.figshare.com/files/67163429",
+        "description": "JARVIS-DFT magmom_oszicar (knn graph).",
+    },
+    "max_efg_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "max_efg",
+        "unit": "",
+        "test_mae": 19.2483,
+        "figshare_article_id": 33135068,
+        "url": "https://ndownloader.figshare.com/files/67163453",
+        "description": "JARVIS-DFT max_efg (knn graph).",
+    },
+    "mbj_bandgap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "mbj_bandgap",
+        "unit": "",
+        "test_mae": 0.273,
+        "figshare_article_id": 33135074,
+        "url": "https://ndownloader.figshare.com/files/67163459",
+        "description": "JARVIS-DFT mbj_bandgap (knn graph).",
+    },
+    "mepsx_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "mepsx",
+        "unit": "",
+        "test_mae": 23.8474,
+        "figshare_article_id": 33135080,
+        "url": "https://ndownloader.figshare.com/files/67163465",
+        "description": "JARVIS-DFT mepsx (knn graph).",
+    },
+    "mepsy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "mepsy",
+        "unit": "",
+        "test_mae": 24.0439,
+        "figshare_article_id": 33135086,
+        "url": "https://ndownloader.figshare.com/files/67163471",
+        "description": "JARVIS-DFT mepsy (knn graph).",
+    },
+    "mepsz_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "mepsz",
+        "unit": "",
+        "test_mae": 23.5306,
+        "figshare_article_id": 33135092,
+        "url": "https://ndownloader.figshare.com/files/67163477",
+        "description": "JARVIS-DFT mepsz (knn graph).",
+    },
+    "mxene275_formation_energy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "formation_energy",
+        "unit": "eV/atom",
+        "test_mae": 0.0343,
+        "figshare_article_id": 33135224,
+        "url": "https://ndownloader.figshare.com/files/67163630",
+        "description": "mxene275 formation energy (kNN).",
+    },
+    "n_Seebeck_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "n_Seebeck",
+        "unit": "",
+        "test_mae": 40.3457,
+        "figshare_article_id": 33135098,
+        "url": "https://ndownloader.figshare.com/files/67163483",
+        "description": "JARVIS-DFT n_Seebeck (knn graph).",
+    },
+    "n_powerfact_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "n_powerfact",
+        "unit": "",
+        "test_mae": 451.904,
+        "figshare_article_id": 33135104,
+        "url": "https://ndownloader.figshare.com/files/67163489",
+        "description": "JARVIS-DFT n_powerfact (knn graph).",
+    },
+    "omdb_bandgap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "bandgap",
+        "unit": "",
+        "test_mae": 0.2411,
+        "figshare_article_id": 33135332,
+        "url": "https://ndownloader.figshare.com/files/67163981",
+        "description": "omdb bandgap (knn).",
+    },
+    "optb88vdw_bandgap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "optb88vdw_bandgap",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135110,
+        "url": "https://ndownloader.figshare.com/files/67163495",
+        "description": "JARVIS-DFT optb88vdw_bandgap (knn graph).",
+    },
+    "optb88vdw_total_energy_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "optb88vdw_total_energy",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135116,
+        "url": "https://ndownloader.figshare.com/files/67163504",
+        "description": "JARVIS-DFT optb88vdw_total_energy (knn graph).",
+    },
+    "pdbbind_binding_affinity_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "binding_affinity",
+        "unit": "",
+        "test_mae": 2.7265,
+        "figshare_article_id": 33135338,
+        "url": "https://ndownloader.figshare.com/files/67163987",
+        "description": "pdbbind binding_affinity (knn).",
+    },
+    "polymer_genome_gga_gap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "gga_gap",
+        "unit": "",
+        "test_mae": 0.2273,
+        "figshare_article_id": 33135233,
+        "url": "https://ndownloader.figshare.com/files/67163639",
+        "description": "polymer_genome gga_gap (knn).",
+    },
+    "qm9_gap": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "qm9_gap",
+        "unit": "eV",
+        "test_mae": 0.031,
+        "figshare_article_id": 33135167,
+        "url": "https://ndownloader.figshare.com/files/67163570",
+        "description": "QM9 HOMO-LUMO gap (kNN).",
+    },
+    "qmof_bandgap": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "qmof_bandgap",
+        "unit": "eV",
+        "test_mae": 0.208,
+        "figshare_article_id": 33135170,
+        "url": "https://ndownloader.figshare.com/files/67163573",
+        "description": "QMOF bandgap (kNN).",
+    },
+    "shear_modulus_gv_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "shear_modulus_gv",
+        "unit": "",
+        "test_mae": 8.8254,
+        "figshare_article_id": 33135122,
+        "url": "https://ndownloader.figshare.com/files/67163510",
+        "description": "JARVIS-DFT shear_modulus_gv (knn graph).",
+    },
+    "slme_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "slme",
+        "unit": "",
+        "test_mae": 4.4475,
+        "figshare_article_id": 33135128,
+        "url": "https://ndownloader.figshare.com/files/67163519",
+        "description": "JARVIS-DFT slme (knn graph).",
+    },
+    "snumat_Band_gap_HSE_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "Band_gap_HSE",
+        "unit": "",
+        "test_mae": 0.3483,
+        "figshare_article_id": 33135977,
+        "url": "https://ndownloader.figshare.com/files/67166072",
+        "description": "snumat Band_gap_HSE (knn).",
+    },
+    "spillage_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "spillage",
+        "unit": "",
+        "test_mae": 0.3456,
+        "figshare_article_id": 33135134,
+        "url": "https://ndownloader.figshare.com/files/67163525",
+        "description": "JARVIS-DFT spillage (knn graph).",
+    },
+    "tc_supercon_hydride_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "Tc_supercon_hydride",
+        "unit": "K",
+        "test_mae": 10.07,
+        "figshare_article_id": 33135218,
+        "url": "https://ndownloader.figshare.com/files/67163624",
+        "description": "Tc_supercon_hydride (kNN, retrained pure-torch).",
+    },
+    "tc_supercon_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "Tc_supercon",
+        "unit": "",
+        "test_mae": 1.49,
+        "figshare_article_id": 33135212,
+        "url": "https://ndownloader.figshare.com/files/67163618",
+        "description": "Tc_supercon (kNN).",
+    },
+    "thermal_cond_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "ltc",
+        "unit": "",
+        "test_mae": 0.375,
+        "figshare_article_id": 33135197,
+        "url": "https://ndownloader.figshare.com/files/67163603",
+        "description": "Lattice thermal cond. log10(kL) (kNN).",
+    },
+    "twod_matpd_bandgap_knn": {
+        "category": "knn",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 1,
+        "target": "bandgap",
+        "unit": "",
+        "test_mae": 0.366,
+        "figshare_article_id": 33135245,
+        "url": "https://ndownloader.figshare.com/files/67163651",
+        "description": "twod_matpd bandgap (knn).",
+    },
+    "a2f": {
+        "category": "spectra",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 100,
+        "target": "a2F",
+        "unit": "",
+        "test_mae": 0.058,
+        "figshare_article_id": 33217434,
+        "url": "https://ndownloader.figshare.com/files/67452780",
+        "description": "Eliashberg alpha^2F(omega) spectral function, 100-bin 0-110.8 meV (radius graph, supercon_3d).",
+    },
+    "dielectric_knn": {
+        "category": "spectra",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 300,
+        "target": "dielectric",
+        "unit": "arb",
+        "test_mae": 0.0005,
+        "figshare_article_id": 33135266,
+        "url": "https://ndownloader.figshare.com/files/67163663",
+        "description": "TBmBJ dielectric function imag_xx 300-bin 0-15 eV (knn graph).",
+    },
+    "dielectric_radius": {
+        "category": "spectra",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 300,
+        "target": "dielectric",
+        "unit": "arb",
+        "test_mae": 0.0005,
+        "figshare_article_id": 33135254,
+        "url": "https://ndownloader.figshare.com/files/67163660",
+        "description": "TBmBJ dielectric function imag_xx 300-bin 0-15 eV (radius graph).",
+    },
+    "edos": {
+        "category": "spectra",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 300,
+        "target": "edos",
+        "unit": "states/eV",
+        "test_mae": 0.0138,
+        "figshare_article_id": 33135158,
+        "url": "https://ndownloader.figshare.com/files/67163561",
+        "description": "300-bin electronic DOS (radius graph).",
+    },
+    "ir_knn": {
+        "category": "spectra",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 200,
+        "target": "ir",
+        "unit": "arb",
+        "test_mae": 0.023,
+        "figshare_article_id": 33135251,
+        "url": "https://ndownloader.figshare.com/files/67163657",
+        "description": "IR spectrum 200-bin 0-2000 cm^-1 (knn graph).",
+    },
+    "ir_radius": {
+        "category": "spectra",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 200,
+        "target": "ir",
+        "unit": "arb",
+        "test_mae": 0.0232,
+        "figshare_article_id": 33135248,
+        "url": "https://ndownloader.figshare.com/files/67163654",
+        "description": "IR spectrum 200-bin 0-2000 cm^-1 (radius graph).",
+    },
+    "pdos": {
+        "category": "spectra",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 200,
+        "target": "pdos",
+        "unit": "states/THz",
+        "test_mae": 0.0819,
+        "figshare_article_id": 33135164,
+        "url": "https://ndownloader.figshare.com/files/67163567",
+        "description": "200-bin phonon DOS (radius graph).",
+    },
+    "raman_knn": {
+        "category": "spectra",
+        "graph": "knn",
+        "cutoff": 8.0,
+        "output_features": 200,
+        "target": "raman_intensity",
+        "unit": "arb",
+        "test_mae": 0.0326,
+        "figshare_article_id": 33134963,
+        "url": "https://ndownloader.figshare.com/files/67163327",
+        "description": "200-bin Raman spectrum (kNN graph).",
+    },
+    "born_tensor": {
+        "category": "tensor",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "born",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135155,
+        "url": "https://ndownloader.figshare.com/files/67163558",
+        "description": "born response tensor (D=1).",
+    },
+    "dielectric_tensor": {
+        "category": "tensor",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 9,
+        "target": "dielectric",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135143,
+        "url": "https://ndownloader.figshare.com/files/67163546",
+        "description": "dielectric response tensor (D=9).",
+    },
+    "elastic_tensor": {
+        "category": "tensor",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 36,
+        "target": "elastic",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135152,
+        "url": "https://ndownloader.figshare.com/files/67163555",
+        "description": "elastic response tensor (D=36).",
+    },
+    "piezo_tensor": {
+        "category": "tensor",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 18,
+        "target": "piezo",
+        "unit": "",
+        "test_mae": None,
+        "figshare_article_id": 33135149,
+        "url": "https://ndownloader.figshare.com/files/67163552",
+        "description": "piezo response tensor (D=18).",
+    },
+    "alignn_ff_db": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "",
+        "test_mae": 0.0564,
+        "figshare_article_id": 33135200,
+        "url": "https://ndownloader.figshare.com/files/67163606",
+        "description": "ALIGNN-FF-DB force field (radius).",
+    },
+    "fd_ff_base": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "",
+        "test_mae": 0.0445,
+        "figshare_article_id": 33135203,
+        "url": "https://ndownloader.figshare.com/files/67163609",
+        "description": "FD-FF 1.1M base force field (radius).",
+    },
+    "fd_ff_ev": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": None,
+        "figshare_article_id": 33134966,
+        "url": "https://ndownloader.figshare.com/files/67163330",
+        "description": "FD-FF + EV/vacancy/surface/interface augmented force field (energy/forces/stress, radius graph).",
+    },
+    "matpes_ff": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": 0.113,
+        "figshare_article_id": 33134972,
+        "url": "https://ndownloader.figshare.com/files/67163336",
+        "description": "Force field trained on MATPES-PBE (keep_data_order, ep100).",
+    },
+    "matpes_pbe_ff": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": 0.218,
+        "figshare_article_id": 33148208,
+        "url": "https://ndownloader.figshare.com/files/67217507",
+        "description": "ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet). PBE energy scale.",
+    },
+    "matpes_r2scan_ff": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": 0.0487,
+        "figshare_article_id": 33190782,
+        "url": "https://ndownloader.figshare.com/files/67360764",
+        "description": "DEFAULT ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
+    },
+    "mlearn_si": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "",
+        "test_mae": 0.0872,
+        "figshare_article_id": 33135206,
+        "url": "https://ndownloader.figshare.com/files/67163612",
+        "description": "mlearn Si force field.",
+    },
+    "mptrj_ff": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": 0.0707,
+        "figshare_article_id": 33134969,
+        "url": "https://ndownloader.figshare.com/files/67163333",
+        "description": "Universal force field trained on MPtrj (~1.5M configs, ep46).",
+    },
+    "charge_atomwise": {
+        "category": "atomwise",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "charge",
+        "unit": "e",
+        "test_mae": None,
+        "figshare_article_id": 33135137,
+        "url": "https://ndownloader.figshare.com/files/67163528",
+        "description": "Per-atom charge (atomwise head).",
+    },
+    "magmom_atomwise": {
+        "category": "atomwise",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "magmom",
+        "unit": "muB",
+        "test_mae": None,
+        "figshare_article_id": 33135140,
+        "url": "https://ndownloader.figshare.com/files/67163543",
+        "description": "Per-atom magmom (atomwise head).",
+    },
+    "net_charge_atomwise": {
+        "category": "atomwise",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "net_charge",
+        "unit": "e",
+        "test_mae": 0.0167,
+        "figshare_article_id": 33135227,
+        "url": "https://ndownloader.figshare.com/files/67163633",
+        "description": "Per-atom net charge (atomwise head).",
+    },
+    # --- add new models here (one entry each) ---
 }
 
-
-parser = argparse.ArgumentParser(
-    description="Atomistic Line Graph Neural Network Pretrained Models"
-)
-parser.add_argument(
-    "--model_name",
-    default="jv_formation_energy_peratom_alignn",
-    help="Choose a model from these "
-    + str(len(list(all_models.keys())))
-    + " models:"
-    + ", ".join(list(all_models.keys())),
-)
-
-parser.add_argument(
-    "--file_format", default="poscar", help="poscar/cif/xyz/pdb file format."
-)
-
-parser.add_argument(
-    "--file_path",
-    default="alignn/examples/sample_data/POSCAR-JVASP-10.vasp",
-    help="Path to file.",
-)
-
-parser.add_argument(
-    "--cutoff",
-    default=8,
-    help="Distance cut-off for graph constuction"
-    + ", usually 8 for solids and 5 for molecules.",
-)
-
-parser.add_argument(
-    "--max_neighbors",
-    default=12,
-    help="Maximum number of nearest neighbors in the periodic atomistic graph"
-    + " construction.",
-)
-
-parser.add_argument(
-    "--pure_torch",
-    action="store_true",
-    help="Use the DGL-free pure-torch model path (ALIGNNAtomWisePure). "
-    "Model names come from all_models_alignn_atomwise.json, e.g. 'mps', "
-    "'formation_energy_peratom', 'mbj_bandgap'. Auto-enabled if DGL is "
-    "not installed.",
-)
+_API = "https://api.figshare.com/v2"
 
 
-device = "cpu"
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-
-# device = "cpu"
-
-
-def get_all_models():
-    """Return the figshare links for models."""
-    return all_models
+def list_alignn2_models(category=None):
+    """Return the registry, optionally filtered by category."""
+    return {
+        k: v
+        for k, v in ALIGNN2_MODELS.items()
+        if category is None or v["category"] == category
+    }
 
 
-def get_figshare_model(model_name="jv_formation_energy_peratom_alignn"):
-    """Get ALIGNN torch models from figshare."""
-    # https://figshare.com/projects/ALIGNN_models/126478
-
-    tmp = all_models[model_name]
-    url = tmp[0]
-    # output_features = tmp[1]
-    # if len(tmp) > 2:
-    #    config_params = tmp[2]
-    # else:
-    #    config_params = {}
-    zfile = model_name + ".zip"
-    # path = str(os.path.join(os.path.dirname(__file__), zfile))
-    path = os.path.join(get_cache_dir("alignn_models"), zfile)
-    if not os.path.isfile(path):
-        response = requests.get(url, stream=True)
-        total_size_in_bytes = int(response.headers.get("content-length", 0))
-        block_size = 1024  # 1 Kibibyte
-        progress_bar = tqdm(
-            total=total_size_in_bytes, unit="iB", unit_scale=True
-        )
-        with open(path, "wb") as file:
-            for data in response.iter_content(block_size):
-                progress_bar.update(len(data))
-                file.write(data)
-        progress_bar.close()
-    zp = zipfile.ZipFile(path)
-    names = zp.namelist()
-    chks = []
-    cfg = []
-    for i in names:
-        if "checkpoint_" in i and "pt" in i:
-            tmp = i
-            chks.append(i)
-        if "config.json" in i:
-            cfg = i
-        if "best_model.pt" in i:
-            tmp = i
-            chks.append(i)
-
-    print("Using chk file", tmp, "from ", chks)
-    print("Path", os.path.abspath(path))
-    print("Config", os.path.abspath(cfg))
-    config = json.loads(zipfile.ZipFile(path).read(cfg))
-    print("config", config, type(config))
-    # print("Loading the zipfile...", zipfile.ZipFile(path).namelist())
-    data = zipfile.ZipFile(path).read(tmp)
-    # model = ALIGNN(
-    #    ALIGNNConfig(
-    #        name="alignn", output_features=output_features, **config_params
-    #    )
-    # )
-    print(config, type(config))
-    if config["model"]["name"] == "alignn":
-        model = ALIGNN(ALIGNNConfig(**config["model"]))
-        new_file, filename = tempfile.mkstemp()
-        with open(filename, "wb") as f:
-            f.write(data)
-        model.load_state_dict(
-            torch.load(filename, map_location=device, weights_only=False)[
-                "model"
-            ]
-        )
-        model.to(device)
-        model.eval()
-        if os.path.exists(filename):
-            os.remove(filename)
-    if config["model"]["name"] == "alignn_atomwise":
-        model = ALIGNNAtomWise(ALIGNNAtomWiseConfig(**config["model"]))
-        new_file, filename = tempfile.mkstemp()
-        with open(filename, "wb") as f:
-            f.write(data)
-        model.load_state_dict(
-            torch.load(filename, map_location=device, weights_only=False)
-        )
-        model.to(device)
-        model.eval()
-        if os.path.exists(filename):
-            os.remove(filename)
-
-    return model
+def resolve_by_target(target, category=None):
+    """Return registry keys whose ``target`` matches (e.g. a property name)."""
+    return [
+        k
+        for k, v in ALIGNN2_MODELS.items()
+        if v.get("target") == target
+        and (category is None or v["category"] == category)
+    ]
 
 
-def _dgl_available():
-    """Return True if DGL can be imported."""
-    try:
-        import dgl  # noqa: F401
-
-        return True
-    except Exception:
-        return False
+def _cache_dir():
+    d = os.path.join(os.path.expanduser("~"), ".alignn2_models")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
-def _atom_features_from_config(config):
-    """Best-effort atom_features string for the pure-torch graph builder."""
-    af = config.get("atom_features")
-    if af:
-        return af
-    n = config.get("model", {}).get("atom_input_features", 92)
-    return "atomic_number" if int(n) == 1 else "cgcnn"
+def get_alignn2_model(name, download=True, cache_dir=None):
+    """Return local paths to a model's artifacts, downloading+caching on first use.
 
-
-def load_pure_torch_model(model_dir, device="cpu"):
-    """Load a pure-torch ALIGNN model (+ config) from a directory.
-
-    The directory must contain ``config.json`` and ``best_model.pt``
-    (the layout produced by ``alignn.ff.ff.get_figshare_model_ff``).
+    Downloads the variant's single flat Figshare zip (``config.json``,
+    ``best_model.pt``, ``ids_train_val_test.json``) via its ``url`` and extracts
+    it to ``~/.alignn2_models/<name>/``.
     """
-    config = loadjson(os.path.join(model_dir, "config.json"))
-    mcfg = dict(config["model"])
-    name = mcfg.get("name", "alignn_atomwise_pure")
-    state = torch.load(
-        os.path.join(model_dir, "best_model.pt"),
-        map_location=device,
-        weights_only=False,
-    )
-    if isinstance(state, dict) and "model" in state:
-        state = state["model"]
-    if name == "alignn_atomwise_pure_smooth":
-        from alignn.models.alignn_atomwise_pure_smooth import (
-            ALIGNNAtomWisePureSmooth,
-            ALIGNNAtomWisePureSmoothConfig,
-        )
-
-        model = ALIGNNAtomWisePureSmooth(
-            ALIGNNAtomWisePureSmoothConfig(**mcfg)
-        )
-    else:
-        from alignn.models.alignn_atomwise_pure import (
-            ALIGNNAtomWisePure,
-            ALIGNNAtomWisePureConfig,
-        )
-
-        mcfg["name"] = "alignn_atomwise_pure"
-        model = ALIGNNAtomWisePure(ALIGNNAtomWisePureConfig(**mcfg))
-    missing, unexpected = model.load_state_dict(state, strict=False)
-    if missing or unexpected:
-        print(
-            f"[pure_torch] load_state_dict: missing={len(missing)} "
-            f"unexpected={len(unexpected)}"
-        )
-    model = model.to(device).eval()
-    return model, config
-
-
-def get_figshare_model_pure(model_name="mps", device="cpu"):
-    """Download a pure-torch ALIGNN model from figshare and load it.
-
-    ``model_name`` must be a key of
-    ``alignn/ff/all_models_alignn_atomwise.json`` (e.g. ``mps``,
-    ``formation_energy_peratom``, ``mbj_bandgap``, ``bulk_modulus_kv``).
-    """
-    from alignn.ff.ff import get_figshare_model_ff
-
-    model_dir = get_figshare_model_ff(model_name=model_name)
-    return load_pure_torch_model(model_dir, device=device)
-
-
-def get_prediction_pure(
-    model_name="mps",
-    atoms=None,
-    cutoff=None,
-    max_neighbors=None,
-    device="cpu",
-):
-    """Single-structure prediction using the DGL-free (pure-torch) path."""
-    from alignn.torch_graph_builder import build_pure_torch_graph
-
-    if os.path.isdir(model_name):
-        model, config = load_pure_torch_model(
-            model_dir=model_name, device=device
-        )
-    else:
-        model, config = get_figshare_model_pure(model_name, device=device)
-
-    # Prefer the model's training cutoff / max_neighbors (correct for an
-    # ML potential); fall back to the supplied values.
-    cut = float(config.get("cutoff", cutoff if cutoff is not None else 8.0))
-    mn = int(
-        config.get(
-            "max_neighbors", max_neighbors if max_neighbors is not None else 12
-        )
-    )
-    atom_features = _atom_features_from_config(config)
-    print(
-        f"[pure_torch] cutoff={cut} max_neighbors={mn} "
-        f"atom_features={atom_features}"
-    )
-    g, lg = build_pure_torch_graph(
-        atoms=atoms,
-        two_body_cutoff=cut,
-        max_neighbors=mn,
-        atom_features=atom_features,
-        compute_line_graph=True,
-        device=device,
-    )
-    lat = (
-        torch.tensor(atoms.lattice_mat)
-        .type(torch.get_default_dtype())
-        .to(device)
-    )
-    out = model([g, lg, lat])
-    out_data = out["out"] if isinstance(out, dict) else out
-    out_data = out_data.detach().cpu().numpy().flatten().tolist()
-    return out_data
-
-
-def get_prediction(
-    model_name="jv_formation_energy_peratom_alignn",
-    atoms=None,
-    cutoff=8,
-    max_neighbors=12,
-    pure_torch=False,
-):
-    """Get model prediction on a single structure.
-
-    If ``pure_torch`` is True, or if DGL is not installed, the DGL-free
-    ``ALIGNNAtomWisePure`` path is used (models from
-    ``all_models_alignn_atomwise.json``, e.g. ``mps``,
-    ``formation_energy_peratom``).
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if pure_torch or not _dgl_available():
-        if not pure_torch:
-            print("DGL not available; using pure-torch model path.")
-        return get_prediction_pure(
-            model_name=model_name,
-            atoms=atoms,
-            cutoff=cutoff,
-            max_neighbors=max_neighbors,
-            device=device,
-        )
-    if os.path.isdir(model_name):
-
-        # import torch
-        # from jarvis.db.jsonutils import loadjson
-
-        config = loadjson(os.path.join(model_name, "config.json"))
-        model_path = os.path.join(model_name, "best_model.pt")
-        tmp = ALIGNNAtomWiseConfig(**config["model"])
-        model = ALIGNNAtomWise(tmp)
-        model.load_state_dict(torch.load(model_path, map_location=device))
-        model = model.to(device)
-        print(model)
-    else:
-        model = get_figshare_model(model_name)
-    # print("Loading completed.")
-    g, lg = Graph.atom_dgl_multigraph(
-        atoms,
-        cutoff=float(cutoff),
-        max_neighbors=max_neighbors,
-    )
-    lat = torch.tensor(atoms.lattice_mat)
-    out_data = model([g.to(device), lg.to(device), lat.to(device)])
-    if isinstance(out_data, dict):
-        out_data = out_data["out"]
-    print("out_data", out_data)
-    out_data = out_data.detach().cpu().numpy().flatten().tolist()
-    return out_data
-
-
-def get_multiple_predictions(
-    atoms_array=[],
-    jids=[],
-    cutoff=8,
-    neighbor_strategy="k-nearest",
-    max_neighbors=12,
-    use_canonize=True,
-    target="prop",
-    atom_features="cgcnn",
-    line_graph=True,
-    workers=0,
-    filename="pred_data.json",
-    include_atoms=True,
-    pin_memory=False,
-    output_features=1,
-    batch_size=1,
-    model=None,
-    model_name="jv_formation_energy_peratom_alignn",
-    print_freq=100,
-    # use_lmdb=True,
-):
-    """Use pretrained model on a number of structures."""
-    # if use_lmdb:
-    #    print("Using LMDB dataset.")
-    #    from alignn.lmdb_dataset import get_torch_dataset
-    # else:
-    #    print("Not using LMDB dataset, memory footprint maybe high.")
-    #    from alignn.dataset import get_torch_dataset
-
-    # import glob
-    # atoms_array=[]
-    # for i in glob.glob("alignn/examples/sample_data/*.vasp"):
-    #      atoms=Atoms.from_poscar(i)
-    #      atoms_array.append(atoms)
-    # get_multiple_predictions(atoms_array=atoms_array)
-    if not jids:
-        jids = ["id-" + str(i) for i in np.arange(len(atoms_array))]
-    mem = []
-    for i, ii in tqdm(enumerate(atoms_array), total=len(atoms_array)):
-        info = {}
-        if isinstance(ii, Atoms):
-            ii = ii.to_dict()
-        info["atoms"] = ii  # .to_dict()
-        info["prop"] = -9999  # place-holder only
-        info["jid"] = jids[i]  # str(i)
-        mem.append(info)
-
-    if model is None:
-        try:
-            model = get_figshare_model(model_name)
-        except Exception as exp:
-            raise ValueError(
-                'Check is the model name exists using "pretrained.py -h"', exp
+    if name not in ALIGNN2_MODELS:
+        raise KeyError(
+            "Unknown model '{}'. Available: {}".format(
+                name, sorted(ALIGNN2_MODELS)
             )
-            pass
-
-    # Note cut-off is usually 8 for solids and 5 for molecules
-    def atoms_to_graph(atoms):
-        """Convert structure dict to DGLGraph."""
-        structure = Atoms.from_dict(atoms)
-        return Graph.atom_dgl_multigraph(
-            structure,
-            cutoff=cutoff,
-            atom_features="atomic_number",
-            max_neighbors=max_neighbors,
-            compute_line_graph=True,
-            use_canonize=use_canonize,
         )
+    meta = ALIGNN2_MODELS[name]
+    dest = os.path.join(cache_dir or _cache_dir(), name)
+    triplet = ["config.json", "best_model.pt", "ids_train_val_test.json"]
+    have = os.path.exists(
+        os.path.join(dest, "best_model.pt")
+    ) and os.path.exists(os.path.join(dest, "config.json"))
+    if download and not have:
+        os.makedirs(dest, exist_ok=True)
+        url = meta.get("url")
+        if not url:  # unmigrated fallback: fetch the article's zip file url
+            r = requests.get(
+                "{}/articles/{}".format(_API, meta["figshare_article_id"])
+            )
+            r.raise_for_status()
+            files = {
+                f["name"]: f["download_url"] for f in r.json().get("files", [])
+            }
+            url = files.get(meta.get("zip")) or next(iter(files.values()))
+        r = requests.get(url, stream=True)
+        r.raise_for_status()
+        zp = os.path.join(dest, "_model.zip")
+        with open(zp, "wb") as o:
+            for c in r.iter_content(1 << 20):
+                o.write(c)
+        with zipfile.ZipFile(zp) as z:
+            members = z.namelist()
+            sub = meta.get("subdir", "")
+            for base in triplet + ["multi_out_predictions.json"]:
+                hit = [
+                    n for n in members if n == base or n.endswith("/" + base)
+                ]
+                if sub:
+                    hit = [
+                        n for n in hit if ("%s/%s" % (sub, base)) in n
+                    ] or hit
+                if hit:
+                    with z.open(hit[0]) as fsrc, open(
+                        os.path.join(dest, base), "wb"
+                    ) as fdst:
+                        fdst.write(fsrc.read())
+        os.remove(zp)
+    return {
+        f: os.path.join(dest, f)
+        for f in triplet
+        if os.path.exists(os.path.join(dest, f))
+    }
 
-    test_data = get_torch_dataset(
-        dataset=mem,
-        target="prop",
-        neighbor_strategy=neighbor_strategy,
-        atom_features=atom_features,
-        use_canonize=use_canonize,
-        line_graph=line_graph,
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility shim
+# ---------------------------------------------------------------------------
+# The legacy DGL-based helpers (``get_figshare_model``,
+# ``get_multiple_predictions``, ``get_prediction`` ...) moved to
+# ``alignn.deprecated.pretrained`` when this module was renamed from
+# ``pretrained2``. They are re-exported here so existing imports of the form
+# ``from alignn.pretrained import get_figshare_model`` keep working. Guarded
+# because the legacy path requires DGL, which the pure-PyTorch ALIGNN 2.0
+# models above do not.
+try:  # pragma: no cover - optional DGL dependency
+    from alignn.deprecated.pretrained import (  # noqa: F401
+        get_all_models,
+        get_figshare_model,
+        get_figshare_model_pure,
+        load_pure_torch_model,
+        get_prediction,
+        get_prediction_pure,
+        get_multiple_predictions,
     )
-
-    collate_fn = test_data.collate_line_graph
-    test_loader = DataLoader(
-        test_data,
-        batch_size=batch_size,
-        shuffle=False,
-        collate_fn=collate_fn,
-        drop_last=False,
-        num_workers=workers,
-        pin_memory=pin_memory,
-    )
-
-    results = []
-    with torch.no_grad():
-        ids = test_loader.dataset.ids
-        for dat, id in zip(test_loader, ids):
-            g, lg, lat, target = dat
-            out_data = model([g.to(device), lg.to(device), lat.to(device)])
-            out_data = out_data.cpu().numpy().tolist()
-            target = target.cpu().numpy().flatten().tolist()
-            info = {}
-            info["id"] = id
-            info["pred"] = out_data
-            results.append(info)
-            print_freq = int(print_freq)
-            if len(results) % print_freq == 0:
-                print(len(results))
-    df1 = pd.DataFrame(mem)
-    df2 = pd.DataFrame(results)
-    df2["jid"] = df2["id"]
-    df3 = pd.merge(df1, df2, on="jid")
-    save = []
-    for i, ii in df3.iterrows():
-        info = {}
-        info["id"] = ii["id"]
-        info["atoms"] = ii["atoms"]
-        info["pred"] = ii["pred"]
-        save.append(info)
-
-    dumpjson(data=save, filename=filename)
-
-
-if __name__ == "__main__":
-    args = parser.parse_args(sys.argv[1:])
-    model_name = args.model_name
-    file_path = args.file_path
-    file_format = args.file_format
-    cutoff = args.cutoff
-    max_neighbors = args.max_neighbors
-    if file_format == "poscar":
-        atoms = Atoms.from_poscar(file_path)
-    elif file_format == "cif":
-        atoms = Atoms.from_cif(file_path)
-    elif file_format == "xyz":
-        atoms = Atoms.from_xyz(file_path, box_size=500)
-    elif file_format == "pdb":
-        atoms = Atoms.from_pdb(file_path, max_lat=500)
-    else:
-        raise NotImplementedError("File format not implemented", file_format)
-
-    out_data = get_prediction(
-        model_name=model_name,
-        cutoff=float(cutoff),
-        max_neighbors=int(max_neighbors),
-        atoms=atoms,
-        pure_torch=args.pure_torch,
-    )
-
-    print("Predicted value:", model_name, file_path, out_data)
-    # import glob
-    # atoms_array = []
-    # for i in glob.glob("alignn/examples/sample_data/*.vasp"):
-    #    atoms = Atoms.from_poscar(i)
-    #    atoms_array.append(atoms)
-    # get_multiple_predictions(atoms_array=atoms_array)
+except Exception:  # DGL not installed / legacy import unavailable
+    pass

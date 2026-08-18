@@ -7,9 +7,10 @@ energy, and the global virial.
 Usage:
     python -m alignn.ff.lammps_bridge \\
         --data system.data \\
-        --model-path alignn/ff/v12.2.2024_dft_3d_307k \\
         --types Si,O \\
         --steps 1000 --timestep 0.001 --temp 300
+    (uses the default ALIGNN-FF model, default_path(); pass --model-path to
+     override with your own model directory.)
 
 Notes:
     - Requires the LAMMPS Python module (`pip install lammps` or build with
@@ -25,8 +26,7 @@ import numpy as np
 from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
 
-from alignn.ff.calculators import AlignnAtomwiseCalculator
-
+from alignn.ff.calculators import AlignnAtomwiseCalculator, default_path
 
 # eV/A^3 -> bar (LAMMPS `metal` pressure unit)
 EV_PER_A3_TO_BAR = 1.602176634e6
@@ -89,7 +89,7 @@ def make_callback(calc, symbols_by_type):
 def run(args):
     from lammps import lammps
 
-    calc = AlignnAtomwiseCalculator(path=args.model_path)
+    calc = AlignnAtomwiseCalculator(path=args.model_path or default_path())
     symbols_by_type = {
         i + 1: sym for i, sym in enumerate(args.types.split(","))
     }
@@ -119,8 +119,7 @@ def run(args):
                 registered = True
             lmp.command(line.rstrip("\n"))
     else:
-        lmp.commands_string(
-            f"""
+        lmp.commands_string(f"""
             units           metal
             atom_style      atomic
             boundary        p p p
@@ -133,11 +132,10 @@ def run(args):
             timestep        {args.timestep}
             velocity        all create {args.temp} {args.seed} mom yes rot yes
             fix             nve all nve
-            fix             tfix all langevin {args.temp} {args.temp} 0.1 {args.seed}  # noqa: E501
+            fix             tfix all langevin {args.temp} {args.temp} 0.1 {args.seed}
             thermo          10
             thermo_style    custom step temp pe ke etotal press
-            """
-        )
+            """)
         cb = make_callback(calc, symbols_by_type)
         lmp.set_fix_external_callback("alignn", cb, lmp)
         lmp.command(f"run {args.steps}")
@@ -153,7 +151,12 @@ def main():
         help="Path to a LAMMPS input script. Must define `fix alignn ... "
         "external pf/callback` before any `run` command. Overrides --data.",
     )
-    p.add_argument("--model-path", required=True, help="ALIGNN-FF model dir")
+    p.add_argument(
+        "--model-path",
+        default=None,
+        help="ALIGNN-FF model dir (default: the bundled default_path() model, "
+        "i.e. matpes_pbe)",
+    )
     p.add_argument(
         "--types",
         required=True,

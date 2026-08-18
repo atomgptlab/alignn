@@ -57,14 +57,30 @@ Pass `--file_format` matching your structure file:
 ## Using from Python
 
 ```python
-from alignn.pretrained import get_prediction
+from ase.build import bulk
+from alignn.ff.unified_calculator import (
+    AlignnUnifiedCalculator, AlignnUnifiedConfig)
 
-prediction = get_prediction(
-    model_name="jv_formation_energy_peratom_alignn",
-    atoms=my_jarvis_atoms,  # jarvis.core.atoms.Atoms
+# Any pretrained ALIGNN 2.0 predictor(s): scalar (formation_energy_peratom,
+# optb88vdw_bandgap, ...), spectra (edos, pdos, ir, raman) or tensor
+# (dielectric_tensor, elastic_tensor, piezo_tensor). prop_graph is "radius"
+# (default, force-field-compatible) or "knn".
+cfg = AlignnUnifiedConfig(
+    energy=False, forces=False, stress=False,   # property-only (no force field)
+    properties=["formation_energy_peratom", "optb88vdw_bandgap"],
 )
-print(prediction)
+calc = AlignnUnifiedCalculator(cfg)   # models downloaded+cached, loaded once
+
+atoms = bulk("Si", "diamond", a=5.43)
+calc.calculate(atoms)                 # single forward pass
+print(calc.predictions())
+# {'formation_energy_peratom': 0.0026, 'optb88vdw_bandgap': 0.7725}
 ```
+
+The pure-PyTorch ALIGNN 2.0 models are pulled from
+[`pretrained2.py`](https://github.com/atomgptlab/alignn/blob/develop/alignn/pretrained2.py)
+(`list_alignn2_models()` shows the full registry). Set `energy=True` to also get
+force-field energy/forces/stress from the same calculator.
 
 ## See also
 

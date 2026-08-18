@@ -494,6 +494,11 @@ def build_pure_torch_graph(
             "atom_features": node_features,
             "frac_coords": frac,
             "V": vol.expand(n_atoms),
+            "Z": torch.as_tensor(
+                np.asarray(atoms.atomic_numbers),
+                dtype=torch.long,
+                device=device,
+            ),
         },
         edata={"r": r, "images": shift},
     )

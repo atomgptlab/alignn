@@ -10,9 +10,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2026.5.20",
-    author="Kamal Choudhary, Brian DeCost",
-    author_email="kamal.choudhary@nist.gov",
+    version="2026.8.11",
+    author="Kamal Choudhary",
+    author_email="drkamal@jhu.edu",
     description="alignn",
     install_requires=[
         # "numpy<2.0",
