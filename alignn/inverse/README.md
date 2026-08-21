@@ -153,32 +153,37 @@ enormous error. Idealising to the detected space group took angle MAE from
 15.9 to 8.4 and KLD from 0.030 to 0.018, with match rate unchanged. Choose the
 tolerance on validation (see `symmetrize_predictions.py --sweep`).
 
-**The line graph buys coordinate precision, not recall.** Against a control
-that deletes the angular channel and spends the same budget on pair-graph depth
-(nine convolution blocks in both arms, parameters matched to within 1%), three
-seeds each:
+**The line graph buys score-fitting, and probably precision, not recall.**
+Against a control that deletes the angular channel and spends the same budget
+on pair-graph depth (nine convolution blocks in both arms, parameters matched
+to within 1%), six models per arm — three seeds on each of two hardware
+platforms:
 
-| | A: line graph | B: no line graph |
-|---|---|---|
-| denoising val loss | **1.997 ± 0.009** | 2.351 ± 0.007 |
-| coordinate RMSD (Å) | **0.030 ± 0.001** | 0.048 ± 0.013 |
-| match rate | 0.4725 ± 0.0341 | 0.4725 ± 0.0448 |
+| | A: line graph | B: no line graph | p |
+|---|---|---|---|
+| denoising val loss | **2.011 ± 0.018** | 2.351 ± 0.007 | 0.002 |
+| coordinate RMSD (Å) | 0.031 ± 0.012 | 0.044 ± 0.011 | 0.18 |
+| ccRMSD | 0.506 ± 0.014 | 0.522 ± 0.019 | 0.13 |
+| match rate | 0.4709 ± 0.0286 | 0.4709 ± 0.0367 | 1.00 |
 
-Angles cut the loss 15% and the RMSD 37%, and make RMSD an order of magnitude
-more reproducible across seeds — but leave match rate unchanged to four decimal
-places. They cost 2.4x per training step. Reproduce with `--alignn-layers 3
---gcn-layers 3` against `--alignn-layers 0 --gcn-layers 9`.
+The loss gap is unambiguous — the twelve runs do not overlap, and the gap
+reproduces to three decimals on a second machine. Downstream, RMSD and ccRMSD
+trend the right way but do not reach significance at this sample size, and
+match rate does not move at all. A first pass with only three seeds showed
+RMSD at 0.030 ± 0.001 vs 0.048 ± 0.013 and looked decisive; that tightness was
+a small-sample artifact. Angles cost 2.4x per training step. Reproduce with
+`--alignn-layers 3 --gcn-layers 3` against `--alignn-layers 0 --gcn-layers 9`.
 
 **Validation loss only partly tracks generation quality.** A fine-tuned model
 with a clearly better val loss (1.90 vs 2.07) scored *worse* on every benchmark
-metric except RMSD, and the ablation above shows a 15% loss gap producing a 37%
-RMSD gap but zero change in match rate. Loss predicts how precisely atoms are
+metric except RMSD, and the ablation above shows a 14.5% loss gap producing a
+non-significant RMSD gap and zero change in match rate. Loss predicts how precisely atoms are
 placed, not how often the right structure is found.
 
-**Report error bars.** Across nine independently trained models the match rate
-on 103 JARVIS targets spanned 0.437–0.524, a spread of nine structures. Single
-runs on splits this size can invert a comparison; only RMSD differences
-survived the seed spread here.
+**Report error bars.** Across fifteen independently trained models the match
+rate on 103 JARVIS targets spanned 0.437-0.524, a spread of nine structures. Single
+runs on splits this size can invert a comparison; only order-of-magnitude coordinate
+differences were safely resolved here.
 
 **Basis-permutation augmentation hurt on the small split.** Despite being a
 correct symmetry of the problem, it consistently cost a little accuracy on
