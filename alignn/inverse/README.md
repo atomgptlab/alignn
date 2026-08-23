@@ -102,6 +102,55 @@ sample(model, schedule, normalizer, batch, guidance=2.0,
        active_modalities=["xrd"])          # structure from a pattern alone
 ```
 
+## Generating a structure
+
+`ALIGNNGenerator` follows the same shape as `AlignnUnifiedCalculator`: build it
+once (which loads the diffusion model and the force field a single time), then
+call it repeatedly.
+
+```python
+from alignn.inverse.generate import ALIGNNGenerator
+
+gen = ALIGNNGenerator(checkpoint="best_model.pt", num_steps=200)
+
+result = gen.generate("NbN", prop=16.0, num_candidates=8)
+print(result.best)          # GeneratedStructure(NNb, 2 atoms, E=-17.91 eV/atom, relaxed=True)
+print(result.atoms)         # jarvis Atoms, ready for anything else in ALIGNN
+print(result.to_poscar())
+```
+
+The composition accepts a formula, a counts dict, or an explicit atom list;
+`formula_units` asks for a larger cell; `prop=None` leaves the property
+unconditioned. Every candidate stays available on `result.candidates`, ordered
+best first.
+
+```python
+gen.generate("Nb3Sn", prop=18.0)                    # formula
+gen.generate({"Mg": 1, "B": 2}, prop=39.0, formula_units=2)   # 6-atom cell
+gen.generate(["Fe", "Fe", "O", "O", "O"])           # explicit atoms, no target
+gen.generate("NbN", prop=16.0, active_modalities=["composition"])
+```
+
+Roughly 35 s per call on one GPU at 200 steps with 8 candidates, of which the
+single relaxation is most of it; a poor candidate that the optimiser struggles
+with can push that to a couple of minutes. Two knobs matter:
+
+- **`num_candidates` is nearly free.** Cost scales with denoising steps, not
+  batch size — 32 candidates take the same wall time as 1 (24 s at 1000 steps,
+  4.6 s at 200, 1.3 s at 50). It is also the strongest lever on quality, which
+  is why it defaults to 8.
+- **`relax_top` (default 1)** decides how many candidates get relaxed. A
+  single-point energy costs ~0.3 s and a relaxation ~100x that, so all
+  candidates are screened cheaply and the budget is spent on the best.
+
+Relaxation runs in-process on one reused force field. Set `relax_workers` above
+1 only for large batches — a pool reloads the force field per worker, and
+because it uses the spawn start method the caller must then be under an
+`if __name__ == "__main__":` guard.
+
+> The step count trades speed for fidelity. The models were trained at 1000
+> steps; whether 200 or 50 preserves benchmark quality has not been measured.
+
 ## Relax and rank
 
 `relax_rank.py` refines candidates with the pretrained ALIGNN force field.
@@ -114,6 +163,10 @@ crystal-structure-prediction recipe, and something a standalone generator
 cannot do.
 
 ## Usage
+
+If you have an existing editable install from before `alignn/inverse` was
+added, re-run `pip install -e .` — the editable finder is generated at install
+time and will not see a new subpackage.
 
 ```bash
 # 1. build a split (needs pymatgen)
