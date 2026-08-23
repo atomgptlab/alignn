@@ -1457,6 +1457,77 @@ ALIGNN2_MODELS = {
         "description": "Per-atom net charge (atomwise head).",
     },
     # --- add new models here (one entry each) ---
+    # --- generative inverse design (ALIGNN-CSP) ------------------------------
+    # Conditional diffusion over lattice + fractional coordinates with an
+    # ALIGNN denoiser. These emit structures rather than properties, so they
+    # are loaded through alignn.inverse.generate.ALIGNNGenerator rather than
+    # the property-prediction path.
+    "csp_supercon_jarvis": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition", "Tc_supercon"],
+        "match_rate": 0.524,
+        "rmsd": 0.056,
+        "figshare_article_id": 33315741,
+        "url": "https://ndownloader.figshare.com/files/67768725",
+        "description": (
+            "ALIGNN-CSP trained from scratch on AtomBench JARVIS "
+            "Supercon-3D; best single benchmark run."
+        ),
+    },
+    "csp_supercon_jarvis_pt": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition", "Tc_supercon"],
+        "match_rate": 0.515,
+        "rmsd": 0.023,
+        "figshare_article_id": 33315744,
+        "url": "https://ndownloader.figshare.com/files/67768728",
+        "description": (
+            "ALIGNN-CSP on JARVIS Supercon-3D, fine-tuned from "
+            "csp_pretrain_dft3d; best coordinate accuracy."
+        ),
+    },
+    "csp_supercon_alex": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition", "Tc"],
+        "match_rate": 0.485,
+        "rmsd": 0.028,
+        "figshare_article_id": 33315747,
+        "url": "https://ndownloader.figshare.com/files/67768731",
+        "description": (
+            "ALIGNN-CSP on AtomBench Alexandria DS-A/B superconductors, "
+            "fine-tuned from csp_pretrain_dft3d."
+        ),
+    },
+    "csp_pretrain_dft3d": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition"],
+        "figshare_article_id": 33315750,
+        "url": "https://ndownloader.figshare.com/files/67768734",
+        "description": (
+            "ALIGNN-CSP base model over 65k JARVIS dft_3d crystals with "
+            "benchmark val/test ids held out; for fine-tuning."
+        ),
+    },
 }
 
 _API = "https://api.figshare.com/v2"

@@ -6,7 +6,7 @@ field a single time, then call it repeatedly.
 
     from alignn.inverse.generate import ALIGNNGenerator
 
-    gen = ALIGNNGenerator(checkpoint="best_model.pt")
+    gen = ALIGNNGenerator(model="csp_supercon_jarvis")
     result = gen.generate("NbN", prop=15.0)
     print(result.atoms)
 
@@ -140,7 +140,10 @@ class ALIGNNGenerator:
     """Generate crystal structures from a composition and a target property.
 
     Args:
-        checkpoint: path to an ALIGNN-CSP checkpoint.
+        model: name of a released model in the ALIGNN 2.0 registry, e.g.
+            ``"csp_supercon_jarvis"``; downloaded and cached on first use.
+            See ``alignn.pretrained.list_alignn2_models("generative")``.
+        checkpoint: path to a local checkpoint, as an alternative to ``model``.
         relax: refine candidates with ALIGNN-FF over cell and positions.
             Leave on: the references a generator is judged against sit at
             local minima of the energy surface, and relaxation is what moves
@@ -164,7 +167,8 @@ class ALIGNNGenerator:
 
     def __init__(
         self,
-        checkpoint: str,
+        model: Optional[str] = None,
+        checkpoint: Optional[str] = None,
         relax: bool = True,
         rank: bool = True,
         num_steps: Optional[int] = None,
@@ -178,6 +182,11 @@ class ALIGNNGenerator:
         relax_workers: Optional[int] = None,
         min_distance: float = 0.7,
     ):
+        if (model is None) == (checkpoint is None):
+            raise ValueError("give exactly one of model= or checkpoint=")
+        if model is not None:
+            checkpoint = resolve_model(model)
+        self.checkpoint = checkpoint
         self.device = torch.device(
             device or ("cuda" if torch.cuda.is_available() else "cpu")
         )
@@ -380,6 +389,27 @@ class ALIGNNGenerator:
         )
 
 
+def resolve_model(name: str) -> str:
+    """Path to a released model's checkpoint, downloading it on first use.
+
+    Names come from the generative section of the ALIGNN 2.0 registry in
+    :mod:`alignn.pretrained`.
+    """
+    from alignn.pretrained import ALIGNN2_MODELS, get_alignn2_model
+
+    meta = ALIGNN2_MODELS.get(name)
+    if meta is None or meta.get("category") != "generative":
+        available = sorted(
+            k
+            for k, v in ALIGNN2_MODELS.items()
+            if v.get("category") == "generative"
+        )
+        raise KeyError(
+            f"unknown generative model {name!r}; available: {available}"
+        )
+    return get_alignn2_model(name)["best_model.pt"]
+
+
 def _formula_of(numbers: Sequence[int]) -> str:
     from collections import Counter
 
@@ -404,7 +434,8 @@ def _as_batched_tensor(value, n: int, device) -> torch.Tensor:
 
 def generate(
     composition: CompositionLike,
-    checkpoint: str,
+    model: Optional[str] = None,
+    checkpoint: Optional[str] = None,
     prop: Optional[float] = None,
     **kwargs,
 ) -> GenerationResult:
@@ -431,6 +462,6 @@ def generate(
             "min_distance",
         }
     }
-    return ALIGNNGenerator(checkpoint, **gen_kwargs).generate(
-        composition, prop=prop, **kwargs
-    )
+    return ALIGNNGenerator(
+        model=model, checkpoint=checkpoint, **gen_kwargs
+    ).generate(composition, prop=prop, **kwargs)

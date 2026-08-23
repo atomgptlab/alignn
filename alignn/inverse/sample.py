@@ -238,7 +238,12 @@ def load_model(checkpoint_path, device, use_ema: bool = True):
         },
         conditioner_spec=ckpt["conditioner_spec"],
     ).to(device)
-    model.load_state_dict(ckpt["ema" if use_ema else "model"])
+    # Released checkpoints carry only the EMA weights, which are the ones
+    # used for sampling; fall back to whichever of the two is present.
+    state = ckpt.get("ema" if use_ema else "model")
+    if state is None:
+        state = ckpt.get("ema") or ckpt["model"]
+    model.load_state_dict(state)
     model.eval()
     normalizer = Normalizer.from_dict(ckpt["normalizer"]).to(device)
     schedule = DiffusionSchedule(
