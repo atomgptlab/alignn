@@ -277,7 +277,7 @@ once, call it repeatedly.
 ```python
 from alignn.inverse.generate import ALIGNNGenerator
 
-gen = ALIGNNGenerator(model="csp_supercon_jarvis")   # downloaded + cached once
+gen = ALIGNNGenerator()          # default model, downloaded + cached once
 
 result = gen.generate("NbN", prop=16.0, num_candidates=8)   # Tc = 16 K
 print(result.best)        # GeneratedStructure(NNb, 2 atoms, E=-17.91 eV/atom, relaxed=True)
@@ -285,8 +285,8 @@ print(result.to_poscar())
 print(result.atoms)       # jarvis Atoms -> feeds any other ALIGNN model
 ```
 
-For `NbN` this returns the rocksalt structure: N at `(0.304, 0.626, 0.720)` and
-Nb at `(0.804, 0.126, 0.220)`, a (½,½,½) offset.
+For `NbN` this returns the rocksalt structure: N at `(0.436, 0.691, 0.674)` and
+Nb at `(0.936, 0.191, 0.174)`, a (½,½,½) offset.
 
 Composition takes a formula, a counts dict, or an explicit atom list;
 `formula_units` asks for a bigger cell; omitting `prop` leaves the property
@@ -302,12 +302,14 @@ gen.generate(["Fe", "Fe", "O", "O", "O"])                    # no target value
 | --- | --- | --- |
 | `csp_supercon_jarvis` | JARVIS Supercon-3D, from scratch | best single benchmark run |
 | `csp_supercon_jarvis_pt` | same, fine-tuned from the base | best coordinate accuracy |
-| `csp_supercon_alex` | Alexandria DS-A/B | |
+| `csp_supercon_alex` | Alexandria DS-A/B | **default** |
 | `csp_pretrain_dft3d` | 65k dft_3d crystals | composition-only base, for fine-tuning |
 
 ```python
 from alignn.pretrained import list_alignn2_models
 list_alignn2_models("generative")
+
+ALIGNNGenerator(model="csp_supercon_jarvis_pt")   # pick a different one
 ```
 
 Conditioning is pluggable rather than fixed to one property — a scalar (Tc,

@@ -6,7 +6,7 @@ field a single time, then call it repeatedly.
 
     from alignn.inverse.generate import ALIGNNGenerator
 
-    gen = ALIGNNGenerator(model="csp_supercon_jarvis")
+    gen = ALIGNNGenerator()                 # DEFAULT_MODEL
     result = gen.generate("NbN", prop=15.0)
     print(result.atoms)
 
@@ -28,6 +28,12 @@ from alignn.inverse.diffusion import DiffusionSchedule
 from alignn.inverse.sample import load_model, sample, to_jarvis_atoms
 
 CompositionLike = Union[str, Dict[str, int], Sequence[Union[int, str]]]
+
+#: Model used when neither ``model`` nor ``checkpoint`` is given. Trained on
+#: the larger of the two superconductor benchmarks (Alexandria DS-A/B, 6603
+#: crystals) and fine-tuned from the dft_3d base, so it is the most broadly
+#: applicable of the released set.
+DEFAULT_MODEL = "csp_supercon_alex"
 
 
 @dataclass
@@ -142,6 +148,7 @@ class ALIGNNGenerator:
     Args:
         model: name of a released model in the ALIGNN 2.0 registry, e.g.
             ``"csp_supercon_jarvis"``; downloaded and cached on first use.
+            Defaults to :data:`DEFAULT_MODEL` when no ``checkpoint`` is given.
             See ``alignn.pretrained.list_alignn2_models("generative")``.
         checkpoint: path to a local checkpoint, as an alternative to ``model``.
         relax: refine candidates with ALIGNN-FF over cell and positions.
@@ -182,8 +189,10 @@ class ALIGNNGenerator:
         relax_workers: Optional[int] = None,
         min_distance: float = 0.7,
     ):
-        if (model is None) == (checkpoint is None):
-            raise ValueError("give exactly one of model= or checkpoint=")
+        if model is not None and checkpoint is not None:
+            raise ValueError("give at most one of model= or checkpoint=")
+        if model is None and checkpoint is None:
+            model = DEFAULT_MODEL
         if model is not None:
             checkpoint = resolve_model(model)
         self.checkpoint = checkpoint
@@ -442,7 +451,8 @@ def generate(
     """One-shot convenience wrapper.
 
     Loads the model on every call, so use :class:`ALIGNNGenerator` directly
-    for more than a single structure.
+    for more than a single structure. With neither ``model`` nor
+    ``checkpoint``, uses :data:`DEFAULT_MODEL`.
     """
     gen_kwargs = {
         k: kwargs.pop(k)

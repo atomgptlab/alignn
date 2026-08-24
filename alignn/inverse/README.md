@@ -111,7 +111,7 @@ call it repeatedly.
 ```python
 from alignn.inverse.generate import ALIGNNGenerator
 
-gen = ALIGNNGenerator(model="csp_supercon_jarvis", num_steps=200)
+gen = ALIGNNGenerator(num_steps=200)        # default model, cached on first use
 
 result = gen.generate("NbN", prop=16.0, num_candidates=8)
 print(result.best)          # GeneratedStructure(NNb, 2 atoms, E=-17.91 eV/atom, relaxed=True)
@@ -120,13 +120,15 @@ print(result.to_poscar())
 ```
 
 Released models are listed in the ALIGNN 2.0 registry and downloaded on first
-use; pass `checkpoint=` instead for a local file.
+use. With no argument you get `DEFAULT_MODEL` (`csp_supercon_alex`, trained on
+the larger of the two superconductor benchmarks); pass `model="name"` to pick
+another or `checkpoint=` for a local file.
 
 | model | trained on | notes |
 |---|---|---|
 | `csp_supercon_jarvis` | JARVIS Supercon-3D, from scratch | best single benchmark run (match 0.524) |
 | `csp_supercon_jarvis_pt` | same, fine-tuned from the base | best coordinate accuracy (RMSD 0.023 Å) |
-| `csp_supercon_alex` | Alexandria DS-A/B | match 0.485, RMSD 0.028 Å |
+| `csp_supercon_alex` **(default)** | Alexandria DS-A/B | match 0.485, RMSD 0.028 Å |
 | `csp_pretrain_dft3d` | 65k dft_3d crystals | composition-only base, for fine-tuning |
 
 ```python
