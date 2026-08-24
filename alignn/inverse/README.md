@@ -19,8 +19,8 @@ in that 6-dimensional space maps back to a valid non-degenerate cell through
 `expm`, so noise can never produce a broken lattice. Standard DDPM with a
 cosine schedule.
 
-**Fractional coordinates.** These live on the torus `[0,1)³`, so they use the
-wrapped-normal score-matching process of DiffCSP with a geometric σ ladder
+**Fractional coordinates.** These live on the torus `[0,1)³`, so they use a
+wrapped-normal score-matching process with a geometric σ ladder
 (0.005 → 0.5). The network predicts the σ-scaled score, which tends to `-z` as
 σ→0 and to `0` as the distribution approaches uniform — well conditioned at
 both ends.

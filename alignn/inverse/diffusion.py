@@ -14,8 +14,8 @@ produce an invalid lattice.  A ``N^{-1/3}`` factor removes the trivial
 dependence on cell size.  Standard DDPM (cosine schedule) runs on the
 standardised 6-vector.
 
-**Fractional coordinates** — these live on the torus [0,1)^3, so we use the
-score-based wrapped-normal process of DiffCSP: ``f_t = w(f_0 + sigma_t * z)``
+**Fractional coordinates** — these live on the torus [0,1)^3, so we use a
+score-based wrapped-normal process: ``f_t = w(f_0 + sigma_t * z)``
 with a geometric sigma schedule.  The network predicts the *sigma-scaled*
 score, which tends to ``-z`` as sigma -> 0 and to ``0`` as the distribution
 approaches uniform, and so is well conditioned at both ends.
