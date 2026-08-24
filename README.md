@@ -17,6 +17,7 @@
 * [Pre-trained models](#pretrained)
 * [JARVIS-ALIGNN webapp](#webapp)
 * [ALIGNN-FF & ASE Calculator](#alignnff)
+* [Inverse design — generate structures](#inverse)
 * [Peformances on a few datasets](#performances)
 * [Useful notes](#notes)
 * [References](#refs)
@@ -263,6 +264,63 @@ energy/forces/stress plus any pretrained ALIGNN 2.0 property predictors —
 scalar, spectra, or D-dim tensor; radius or kNN graph).
 See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for more,
 and the ASE docs page *Calculators → ALIGNN*.
+
+<a name="inverse"></a>
+## Inverse design — generate structures
+
+The same line graph also runs backwards. **ALIGNN-CSP** is a conditional
+diffusion model over the lattice and the fractional coordinates that takes a
+composition and a target property and returns a structure, then relaxes and
+ranks candidates with ALIGNN-FF. It is used like the ASE calculator: build it
+once, call it repeatedly.
+
+```python
+from alignn.inverse.generate import ALIGNNGenerator
+
+gen = ALIGNNGenerator(model="csp_supercon_jarvis")   # downloaded + cached once
+
+result = gen.generate("NbN", prop=16.0, num_candidates=8)   # Tc = 16 K
+print(result.best)        # GeneratedStructure(NNb, 2 atoms, E=-17.91 eV/atom, relaxed=True)
+print(result.to_poscar())
+print(result.atoms)       # jarvis Atoms -> feeds any other ALIGNN model
+```
+
+For `NbN` this returns the rocksalt structure: N at `(0.304, 0.626, 0.720)` and
+Nb at `(0.804, 0.126, 0.220)`, a (½,½,½) offset.
+
+Composition takes a formula, a counts dict, or an explicit atom list;
+`formula_units` asks for a bigger cell; omitting `prop` leaves the property
+unconditioned. Every candidate stays on `result.candidates`, best first.
+
+```python
+gen.generate("Nb3Sn", prop=18.0)                             # formula
+gen.generate({"Mg": 1, "B": 2}, prop=39.0, formula_units=2)  # 6-atom cell
+gen.generate(["Fe", "Fe", "O", "O", "O"])                    # no target value
+```
+
+| Released model | Trained on | Notes |
+| --- | --- | --- |
+| `csp_supercon_jarvis` | JARVIS Supercon-3D, from scratch | best single benchmark run |
+| `csp_supercon_jarvis_pt` | same, fine-tuned from the base | best coordinate accuracy |
+| `csp_supercon_alex` | Alexandria DS-A/B | |
+| `csp_pretrain_dft3d` | 65k dft_3d crystals | composition-only base, for fine-tuning |
+
+```python
+from alignn.pretrained import list_alignn2_models
+list_alignn2_models("generative")
+```
+
+Conditioning is pluggable rather than fixed to one property — a scalar (Tc,
+band gap), the composition, a 1-D signal such as an XRD pattern, or a 2-D map
+such as a STEM image. Each is dropped independently during training, so one
+checkpoint can generate from any subset at sampling time.
+
+Two knobs matter for speed. `num_candidates` is nearly free, because cost
+scales with the number of denoising steps rather than the batch size, and it is
+the strongest lever on quality. `num_steps` trades fidelity for latency (~24 s
+at the trained 1000 steps, ~4.6 s at 200). Training your own model and
+reproducing the AtomBench benchmarks is covered in
+[alignn/inverse/README.md](alignn/inverse/README.md).
 
 <a name="performances"></a>
 ## Performances
