@@ -324,6 +324,11 @@ at the trained 1000 steps, ~4.6 s at 200). Training your own model and
 reproducing the AtomBench benchmarks is covered in
 [alignn/inverse/README.md](alignn/inverse/README.md).
 
+That page also documents an optional research extension, off by default:
+making bond angles an explicit **denoising channel** rather than only an input
+feature, with a line-graph topology that varies continuously as the
+coordinates denoise, plus the ablation suite that tells the two apart.
+
 <a name="performances"></a>
 ## Performances
 

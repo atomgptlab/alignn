@@ -168,6 +168,178 @@ because it uses the spawn start method the caller must then be under an
 > The step count trades speed for fidelity. The models were trained at 1000
 > steps; whether 200 or 50 preserves benchmark quality has not been measured.
 
+## Explicit bond-angle diffusion (optional)
+
+Everything above treats bond angles as an *input feature*: ALIGNN computes
+them, the line graph propagates them, and they help the network predict where
+the atoms should go. They are never themselves something the model denoises.
+This section adds the option of making them one, and of letting the triplet
+topology change continuously while it does. All of it is off by default —
+`ALIGNNCSPDenoiser()` with no arguments is byte-for-byte the model described
+above, and a test asserts that switching the angle head on leaves `eps_frac`
+and `eps_lattice` unchanged.
+
+The hypothesis under test is narrow: **does explicit three-body geometric
+denoising improve crystal generation when embedded in ALIGNN's
+atom–bond–line-graph hierarchy?** It is a hypothesis, not a claim — nothing
+here has been trained yet.
+
+### The angular channel
+
+The model gains one output head, reading the line-graph feature `z` of the
+same backbone that already produces the coordinate score and the lattice
+noise. Per triplet it predicts the angular displacement the forward process
+introduced,
+
+```
+delta_ijk = wrap( theta_ijk(f_t, L_t) - theta_ijk(f_0, L_0) )
+```
+
+trained with a wrapped smooth-L1 loss (`beta = 0.1 pi`). Both the target and
+the loss are FoldingDiff's, which runs DDPM-style corruption and denoising
+directly on protein bond and dihedral angles and shows that a model with an
+explicit angular channel reproduces natural angular distributions.
+
+**One honest deviation.** FoldingDiff can diffuse a genuinely persistent
+`theta_t` because a protein backbone's internal-coordinate list is fixed:
+residue *i* always has the same three angles. A crystal being denoised from
+noise has no such list — the triplet set is a function of the coordinates and
+changes as they move, so there is no independent angular state to noise. What
+is implemented is the closest well-defined thing: the angular *target* is
+computed on the triplet representation that exists at the current step, with
+both angles evaluated on the same periodic-image identity
+`(i, j, k, n_ji, n_jk)` so the difference measures the corruption of one
+triplet rather than a change of neighbour. Angles are an explicit denoising
+objective with their own head and their own loss; they are not an
+independently-noised variable. No new SDE, angle manifold or schedule was
+invented to paper over the difference.
+
+The angular representation itself is untouched — ALIGNN's Gaussian RBF over
+`cos(theta)` — so that the experiment measures the *objective*, not a change
+of basis.
+
+### Continuous topology
+
+At large `t` the coordinates are close to uniform, and a hard neighbour-rank
+rule for "does this triplet exist" is unjustified: ranks swap constantly and
+the line graph jumps. `topology="radius"` replaces the kNN rule with a radius
+candidate set in which every pair carries a smooth relevance
+
+```
+s_ij  = u(r_ij ; r_c)        DimeNet's polynomial envelope: u, u' and u''
+                             all vanish at r_c
+s_ijk = s_ji * s_jk          ReaxFF's treatment of valence angles: an angle
+                             switches off smoothly as either bond dissociates
+```
+
+`u` is not re-derived — it is `CutoffPolynomial`, already in this repository
+for the smooth property model. The weight multiplies the gate *before both*
+sums of the edge-gated convolution's normalised average, which is the only
+placement that makes a zero-weight edge exactly equivalent to a deleted one;
+scaling the numerator alone would renormalise the survivors and would not be
+continuous. Because `s` is exactly zero at and beyond `r_c`, restricting the
+sparse graph to pairs inside `r_c` drops only terms already contributing
+nothing, so a triplet can enter or leave without any jump — which is what the
+tests check by sweeping an atom through the cutoff and watching the output.
+
+The graph is rebuilt from the current coordinates and lattice on every
+forward pass, so the topology follows the geometry through reverse diffusion
+on its own. There is no connectivity annealing schedule, no graph-temperature
+term and no learned bondness network; `r_ij(t)` evolving is the whole
+mechanism.
+
+`radius_cutoff` defaults to 5 Å — between this repository's own three-body
+cutoff (3.5 Å) and DimeNet's molecular cutoff (5 Å), and close to the radius
+the baseline's 12 nearest neighbours actually span, which keeps the kNN
+comparison fair.
+
+### Ablations
+
+Ablations are the point, not an afterthought: a single "it improved" number
+cannot separate the three claims. `alignn/inverse/ablations.py` holds the
+configurations, `scripts/atombench/run_angle_ablation.sh` runs them with the
+same split, optimiser, epoch budget and seed list across every arm.
+
+| | angular objective | topology | angle → bond coupling |
+|---|---|---|---|
+| **A0** baseline | – | kNN | – |
+| **A1** | yes | kNN | yes |
+| **A2** | – | smooth radius | – |
+| **A3** proposed | yes | smooth radius | yes |
+| **A4** control | yes | smooth radius | **cut** |
+| **A6** | yes | smooth radius | yes, Fourier angle basis |
+
+Which contrast answers what:
+
+- **A0 vs A1** — does explicit angular denoising help on its own?
+- **A0 vs A2** — or is the gain just from a better-behaved noisy graph?
+- **A4 vs A3** — is the benefit genuine coupling, or would auxiliary
+  supervision on a shared trunk do as well? A4 keeps the angular features
+  evolving and supervised but zeroes their contribution to the bond
+  representation, so its coordinate/lattice pathway provably cannot see them
+  (a test perturbs the angle embedding and asserts A4's output does not move
+  while A3's does).
+- **A1 vs A3** — the design brief's A5: hard kNN against the smooth radius
+  graph. It is a comparison between existing arms, not a seventh
+  configuration.
+- **A3 vs A6** — does the angular basis matter? Run this *last*; mixing a
+  basis change into the primary experiment would make attribution impossible.
+
+```bash
+bash scripts/atombench/run_angle_ablation.sh runs/data_jarvis runs/ablation 0 1 2
+```
+
+Given the spread already recorded above — match rate across fifteen
+independently trained models spanned 0.437–0.524 — one seed per arm cannot
+settle any of these. The runner defaults to three.
+
+### Evaluation
+
+Every existing AtomBench metric is preserved. Two mechanism metrics are added,
+defined before the runs so that a favourable one cannot be picked afterwards:
+
+- **bond-angle distributions**, generated against held-out real structures
+  (KL, Jensen-Shannon, and a 1-D Wasserstein distance reported in degrees) —
+  FoldingDiff's own diagnostic;
+- **relaxation displacement**, how far a sample moves to reach its nearest
+  ALIGNN-FF local minimum, with the volume change and energy drop — the
+  proximity-to-local-minimum evaluation MatterGen uses. If explicit angular
+  denoising produces locally coherent geometry, its samples should need less
+  repair.
+
+```bash
+python scripts/atombench/angle_eval.py runs/ablation/A3_s0/bench.csv --relax
+```
+
+### What is deliberately not here
+
+DimeNet's joint spherical Fourier–Bessel distance–angle basis is **not**
+implemented; A6 substitutes the Fourier basis on theta this repository
+already ships. The full SBF needs spherical Bessel zeros and a new
+dependency, and the design brief sequences that ablation last, so it is
+deferred rather than half-done. Also absent, deliberately: cross-attention,
+separate networks per variable, a learned bondness classifier, a
+time-dependent graph-temperature schedule, Jacobian angle forces, and any
+loss whose role cannot be traced to one of the papers below.
+
+Note that atom types are *not* diffused — the generator is conditioned on
+composition — so the state is really `(F, L)` and, with this extension,
+`(F, L, Theta)`. The `A` in the ablation names follows the design brief's
+notation.
+
+### References
+
+| | |
+|---|---|
+| ALIGNN — atom graph + line graph, angles update bonds update atoms | Choudhary & DeCost, *npj Comput. Mater.* **7**, 185 (2021), [10.1038/s41524-021-00650-1](https://doi.org/10.1038/s41524-021-00650-1) |
+| FoldingDiff — diffusion directly on bond angles; wrapped noise, wrapped smooth-L1, angle-distribution evaluation | Wu *et al.*, *Nat. Commun.* **15**, 1059 (2024), [10.1038/s41467-024-45051-2](https://doi.org/10.1038/s41467-024-45051-2) |
+| Torsional Diffusion — diffusion on angular configuration spaces | Jing *et al.*, NeurIPS 2022 |
+| ReaxFF — continuous distance-dependent bond order; angle terms vanish as either bond dissociates | van Duin *et al.*, *J. Phys. Chem. A* **105**, 9396 (2001), [10.1021/jp004368u](https://doi.org/10.1021/jp004368u) |
+| DimeNet — cutoff envelope whose value and first two derivatives vanish at `r_c` | Gasteiger, Groß & Günnemann, ICLR 2020, [arXiv:2003.03123](https://arxiv.org/abs/2003.03123) |
+| MatterGen — one score network denoising crystal variables jointly; proximity-to-relaxed evaluation | Zeni *et al.*, *Nature* **639**, 624 (2025), [10.1038/s41586-025-08628-5](https://doi.org/10.1038/s41586-025-08628-5) |
+| DiffCSP — joint equivariant diffusion of lattice and fractional coordinates | Jiao *et al.*, NeurIPS 2023 |
+| CrystalDiT — the warning against unnecessary multi-stream architectural complexity | Yi *et al.*, AAAI 2026, [10.1609/aaai.v40i2.37121](https://doi.org/10.1609/aaai.v40i2.37121) |
+
 ## Relax and rank
 
 `relax_rank.py` refines candidates with the pretrained ALIGNN force field.

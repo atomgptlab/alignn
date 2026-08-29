@@ -7,11 +7,16 @@ import json
 import time
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 from torch.utils.data import DataLoader
 
+from alignn.inverse.ablations import ABLATIONS, ablation_config, describe
+from alignn.inverse.angles import (
+    angle_denoising_loss,
+    angular_denoising_target,
+)
 from alignn.inverse.data import (
     CrystalDataset,
     Normalizer,
@@ -52,6 +57,31 @@ class EMA:
             s.copy_(p)
 
 
+def angle_loss_from_output(out: Dict, batch: Dict) -> Optional[torch.Tensor]:
+    """Angular denoising loss for one forward pass, or ``None`` if disabled.
+
+    The target is the angular displacement the forward process applied to
+    each triplet, evaluated on the same periodic images the noised geometry
+    was resolved against, and the loss is FoldingDiff's relevance-weighted
+    wrapped smooth-L1.  See :mod:`alignn.inverse.angles`.
+    """
+    aux = out.get("angle")
+    if aux is None:
+        return None
+    target = angular_denoising_target(
+        aux["theta_t"],
+        batch["frac"],
+        batch["lattice"],
+        aux["src"],
+        aux["dst"],
+        aux["edge_graph_id"],
+        aux["image"],
+        aux["lg_src"],
+        aux["lg_dst"],
+    )
+    return angle_denoising_loss(aux["eps"], target, aux["weight"])
+
+
 def diffusion_loss(
     model: ALIGNNCSP,
     schedule: DiffusionSchedule,
@@ -60,6 +90,7 @@ def diffusion_loss(
     cond_dropout: Dict[str, float],
     lattice_weight: float,
     frac_weight: float,
+    angle_weight: float = 0.0,
 ) -> Dict[str, torch.Tensor]:
     device = batch["frac"].device
     natoms = batch["natoms"]
@@ -97,10 +128,17 @@ def diffusion_loss(
     )
     loss_lat = torch.nn.functional.mse_loss(out["eps_lattice"], eps_lat)
     loss_frac = torch.nn.functional.mse_loss(out["eps_frac"], target_frac)
+    total = lattice_weight * loss_lat + frac_weight * loss_frac
+    loss_ang = angle_loss_from_output(out, batch)
+    if loss_ang is None:
+        loss_ang = loss_frac.new_zeros(())
+    else:
+        total = total + angle_weight * loss_ang
     return {
-        "loss": lattice_weight * loss_lat + frac_weight * loss_frac,
+        "loss": total,
         "loss_lattice": loss_lat.detach(),
         "loss_frac": loss_frac.detach(),
+        "loss_angle": loss_ang.detach(),
     }
 
 
@@ -176,6 +214,34 @@ def main():
     ap.add_argument("--composition-dropout", type=float, default=0.1)
     ap.add_argument("--lattice-weight", type=float, default=1.0)
     ap.add_argument("--frac-weight", type=float, default=10.0)
+
+    # ── angular channel and graph topology ──────────────────────────────
+    # --ablation picks a named configuration; the individual switches below
+    # override it, and on their own default to the original model.
+    ap.add_argument(
+        "--ablation",
+        default="A0",
+        choices=sorted(ABLATIONS),
+        help="named ablation (see alignn.inverse.ablations); "
+        "A0 is the unmodified baseline",
+    )
+    ap.add_argument("--angle-diffusion", type=int, default=None)
+    ap.add_argument("--angle-feedback", type=int, default=None)
+    ap.add_argument("--topology", default=None, choices=["knn", "radius"])
+    ap.add_argument("--radius-cutoff", type=float, default=None)
+    ap.add_argument("--envelope-exponent", type=int, default=None)
+    ap.add_argument("--gate-pair-messages", type=int, default=None)
+    ap.add_argument(
+        "--angle-basis", default=None, choices=["cosine_rbf", "fourier"]
+    )
+    ap.add_argument(
+        "--angle-weight",
+        type=float,
+        default=1.0,
+        help="weight on the angular denoising loss; ignored when the "
+        "angular channel is off, and must be held fixed across an "
+        "ablation comparison",
+    )
     ap.add_argument("--ema-decay", type=float, default=0.999)
     ap.add_argument("--grad-clip", type=float, default=1.0)
     ap.add_argument(
@@ -235,17 +301,42 @@ def main():
         "composition": args.composition_dropout,
     }
 
+    denoiser_config = {
+        "hidden_features": args.hidden_features,
+        "alignn_layers": args.alignn_layers,
+        "gcn_layers": args.gcn_layers,
+        "knn": args.knn,
+        "num_steps": args.num_steps,
+        **ablation_config(args.ablation),
+    }
+    # Explicit switches win over the named ablation, so a one-off variant does
+    # not need a new entry in the table.
+    overrides = {
+        "angle_diffusion": args.angle_diffusion,
+        "angle_feedback": args.angle_feedback,
+        "topology": args.topology,
+        "radius_cutoff": args.radius_cutoff,
+        "envelope_exponent": args.envelope_exponent,
+        "gate_pair_messages": args.gate_pair_messages,
+        "angle_basis": args.angle_basis,
+    }
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        if key in ("angle_diffusion", "angle_feedback", "gate_pair_messages"):
+            value = bool(value)
+        denoiser_config[key] = value
+    # Record what was actually built, so a checkpoint reconstructs itself.
+    for key, value in denoiser_config.items():
+        setattr(args, key, value)
+
     model = ALIGNNCSP(
-        denoiser_config={
-            "hidden_features": args.hidden_features,
-            "alignn_layers": args.alignn_layers,
-            "gcn_layers": args.gcn_layers,
-            "knn": args.knn,
-            "num_steps": args.num_steps,
-        },
+        denoiser_config=denoiser_config,
         conditioner_spec=conditioner_spec,
     ).to(device)
     n_par = sum(p.numel() for p in model.parameters())
+    print(f"ablation {args.ablation}: {describe(args.ablation)}")
+    print(f"denoiser: {json.dumps(denoiser_config)}")
     print(f"parameters: {n_par / 1e6:.2f}M  modalities: {model.modalities}")
 
     if args.init_from:
@@ -306,7 +397,12 @@ def main():
     t_start = time.time()
     for epoch in range(1, args.epochs + 1):
         model.train()
-        agg = {"loss": 0.0, "loss_lattice": 0.0, "loss_frac": 0.0}
+        agg = {
+            "loss": 0.0,
+            "loss_lattice": 0.0,
+            "loss_frac": 0.0,
+            "loss_angle": 0.0,
+        }
         nb = 0
         for batch in train_dl:
             batch = batch_to(batch, device)
@@ -318,6 +414,7 @@ def main():
                 cond_dropout,
                 args.lattice_weight,
                 args.frac_weight,
+                args.angle_weight,
             )
             opt.zero_grad(set_to_none=True)
             losses["loss"].backward()
@@ -333,7 +430,12 @@ def main():
 
         # Validation uses the EMA weights, with the timestep draw fixed so the
         # curve is comparable epoch to epoch rather than dominated by noise.
-        val_agg = {"loss": 0.0, "loss_lattice": 0.0, "loss_frac": 0.0}
+        val_agg = {
+            "loss": 0.0,
+            "loss_lattice": 0.0,
+            "loss_frac": 0.0,
+            "loss_angle": 0.0,
+        }
         nv = 0
         gen_state = torch.random.get_rng_state()
         torch.manual_seed(1234)
@@ -348,6 +450,7 @@ def main():
                     {k: 0.0 for k in cond_dropout},
                     args.lattice_weight,
                     args.frac_weight,
+                    args.angle_weight,
                 )
                 for k in val_agg:
                     val_agg[k] += float(losses[k])
@@ -372,12 +475,18 @@ def main():
                 out_dir / "best_model.pt",
             )
         if epoch % args.log_every == 0 or epoch == 1:
+            ang = (
+                f" ang {agg['loss_angle']:.4f}/{val_agg['loss_angle']:.4f}"
+                if denoiser_config.get("angle_diffusion")
+                else ""
+            )
             print(
                 f"epoch {epoch:5d}  train {agg['loss']:.4f} "
                 f"(lat {agg['loss_lattice']:.4f} frac {agg['loss_frac']:.4f})"
                 f"  val {val_agg['loss']:.4f} "
                 f"(lat {val_agg['loss_lattice']:.4f} "
                 f"frac {val_agg['loss_frac']:.4f})"
+                f"{ang}"
                 f"  best {best_val:.4f}  {time.time() - t_start:.0f}s",
                 flush=True,
             )
