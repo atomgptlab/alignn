@@ -24,6 +24,11 @@ plus the fractional volume change and the energy drop.
 Nothing here is used to select a model — the suite is fixed before the
 ablations are run, exactly so that a favourable metric cannot be chosen after
 seeing the results.
+
+Everything is plain PyTorch, on the same neighbour list the model itself uses,
+so the angles being scored are the angles ALIGNN would see.  ``jarvis`` enters
+only to parse POSCARs and the ASE force field only through the existing
+:mod:`alignn.inverse.relax_rank`.
 """
 
 from __future__ import annotations
@@ -31,7 +36,6 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional, Sequence
 
-import numpy as np
 import torch
 
 __all__ = [
@@ -43,18 +47,61 @@ __all__ = [
 ]
 
 #: Neighbour cutoff and count used for every angle measurement.  These match
-#: the pure-torch graph builder's own three-body defaults so that the angles
-#: being scored are the ones ALIGNN would see.
+#: the pure-torch graph builder's own three-body defaults.
 DEFAULT_ANGLE_CUTOFF = 3.5
 DEFAULT_MAX_NEIGHBORS = 12
 DEFAULT_BINS = 180
+
+_EPS = 1e-12
+
+
+def _atoms_to_tensors(atoms, dtype=torch.float64):
+    """Cartesian positions and lattice of a jarvis ``Atoms`` as tensors."""
+    return (
+        torch.tensor(atoms.cart_coords, dtype=dtype),
+        torch.tensor(atoms.lattice_mat, dtype=dtype),
+    )
+
+
+def _same_source_pairs(src: torch.Tensor, num_nodes: int):
+    """Unordered pairs of edges sharing a source node.
+
+    Same construction the line-graph builder uses: group the edges by their
+    shared node, expand each group to all ordered pairs, then keep one of
+    each two.  Returns indices into the edge list.
+    """
+    n_edges = int(src.shape[0])
+    device = src.device
+    if n_edges == 0:
+        empty = torch.empty(0, dtype=torch.long, device=device)
+        return empty, empty
+    order = torch.argsort(src, stable=True)
+    src_sorted = src[order]
+    counts = torch.bincount(src_sorted, minlength=num_nodes)
+    starts = torch.cumsum(counts, 0) - counts
+    # Every edge pairs with each edge in its own group.
+    per_edge = counts[src_sorted]
+    total = int(per_edge.sum())
+    if total == 0:
+        empty = torch.empty(0, dtype=torch.long, device=device)
+        return empty, empty
+    positions = torch.arange(n_edges, device=device)
+    left = torch.repeat_interleave(positions, per_edge)
+    cum = torch.cumsum(per_edge, 0)
+    row_start = cum - per_edge
+    offsets = torch.arange(total, device=device) - torch.repeat_interleave(
+        row_start, per_edge
+    )
+    right = torch.repeat_interleave(starts[src_sorted], per_edge) + offsets
+    keep = left < right
+    return order[left[keep]], order[right[keep]]
 
 
 def bond_angles_deg(
     atoms,
     cutoff: float = DEFAULT_ANGLE_CUTOFF,
     max_neighbors: Optional[int] = DEFAULT_MAX_NEIGHBORS,
-) -> np.ndarray:
+) -> torch.Tensor:
     """Every bond angle in one structure, in degrees.
 
     An angle is formed by each unordered pair of neighbours of a central atom,
@@ -63,12 +110,7 @@ def bond_angles_deg(
     """
     from alignn.torch_graph_builder import torch_neighbor_list
 
-    positions = torch.tensor(
-        np.asarray(atoms.cart_coords, dtype=float), dtype=torch.float64
-    )
-    lattice = torch.tensor(
-        np.asarray(atoms.lattice_mat, dtype=float), dtype=torch.float64
-    )
+    positions, lattice = _atoms_to_tensors(atoms)
     src, _dst, _shift, r = torch_neighbor_list(
         positions,
         lattice,
@@ -76,96 +118,95 @@ def bond_angles_deg(
         max_neighbors=max_neighbors,
         use_matscipy_topology=False,
     )
-    src_np = src.numpy()
-    # r points from src outward, so the angle at the central atom is taken
-    # between two of its outgoing vectors directly.
-    vec = r.numpy()
-    out: List[float] = []
-    order = np.argsort(src_np, kind="stable")
-    src_sorted, vec_sorted = src_np[order], vec[order]
-    bounds = np.searchsorted(
-        src_sorted, np.arange(int(positions.shape[0]) + 1)
+    left, right = _same_source_pairs(src, int(positions.shape[0]))
+    if left.numel() == 0:
+        return torch.zeros(0, dtype=positions.dtype)
+    # r points away from the shared atom, so the interior angle is the plain
+    # angle between the two outgoing vectors.
+    a = r[left]
+    b = r[right]
+    cos = (a * b).sum(-1) / (
+        a.norm(dim=-1).clamp_min(_EPS) * b.norm(dim=-1).clamp_min(_EPS)
     )
-    for j in range(int(positions.shape[0])):
-        v = vec_sorted[bounds[j] : bounds[j + 1]]
-        if len(v) < 2:
-            continue
-        unit = v / np.linalg.norm(v, axis=1, keepdims=True).clip(1e-12)
-        cos = unit @ unit.T
-        iu = np.triu_indices(len(v), k=1)
-        out.append(np.degrees(np.arccos(np.clip(cos[iu], -1.0, 1.0))))
-    if not out:
-        return np.zeros(0)
-    return np.concatenate(out)
+    return torch.rad2deg(torch.acos(cos.clamp(-1.0, 1.0)))
 
 
 def collect_bond_angles(
     structures: Sequence,
     cutoff: float = DEFAULT_ANGLE_CUTOFF,
     max_neighbors: Optional[int] = DEFAULT_MAX_NEIGHBORS,
-) -> np.ndarray:
+) -> torch.Tensor:
     """Bond angles pooled over a list of structures, in degrees."""
     parts = [
         bond_angles_deg(a, cutoff=cutoff, max_neighbors=max_neighbors)
         for a in structures
     ]
-    parts = [p for p in parts if p.size]
-    return np.concatenate(parts) if parts else np.zeros(0)
+    parts = [p for p in parts if p.numel()]
+    if not parts:
+        return torch.zeros(0)
+    return torch.cat(parts)
 
 
-def _density(angles: np.ndarray, bins: int) -> np.ndarray:
-    counts, _ = np.histogram(angles, bins=bins, range=(0.0, 180.0))
+def _density(angles: torch.Tensor, bins: int) -> torch.Tensor:
+    """Normalised histogram over [0, 180] degrees."""
+    x = torch.as_tensor(angles, dtype=torch.float64).flatten()
+    if x.numel() == 0:
+        return torch.zeros(bins, dtype=torch.float64)
+    # Bucket by index rather than torch.histc so that the closed right edge
+    # (a perfectly straight 180-degree angle) lands in the last bin.
+    idx = (x.clamp(0.0, 180.0) * (bins / 180.0)).long().clamp(0, bins - 1)
+    counts = torch.bincount(idx, minlength=bins).to(torch.float64)
     total = counts.sum()
-    return counts / total if total else counts.astype(float)
+    return counts / total if total > 0 else counts
 
 
 def compare_angle_distributions(
-    generated: np.ndarray,
-    reference: np.ndarray,
+    generated: torch.Tensor,
+    reference: torch.Tensor,
     bins: int = DEFAULT_BINS,
     eps: float = 1e-9,
 ) -> Dict[str, float]:
     """Distances between two pooled bond-angle distributions.
 
-    ``wasserstein`` is exact for a 1-D histogram (the integral of the absolute
-    CDF difference) and is reported in degrees, so it reads directly as "the
+    ``wasserstein_deg`` is exact for a 1-D histogram (the integral of the
+    absolute CDF difference) and is in degrees, so it reads directly as "the
     generated angles are off by this much on average".
     """
-    p = _density(np.asarray(generated), bins)
-    q = _density(np.asarray(reference), bins)
+    p = _density(generated, bins)
+    q = _density(reference, bins)
     ps, qs = p + eps, q + eps
     ps, qs = ps / ps.sum(), qs / qs.sum()
-    kl = float((ps * np.log(ps / qs)).sum())
+    kl = float((ps * (ps / qs).log()).sum())
     m = 0.5 * (ps + qs)
     js = float(
-        0.5 * (ps * np.log(ps / m)).sum() + 0.5 * (qs * np.log(qs / m)).sum()
+        0.5 * (ps * (ps / m).log()).sum() + 0.5 * (qs * (qs / m).log()).sum()
     )
     width = 180.0 / bins
-    emd = float(np.abs(np.cumsum(p) - np.cumsum(q)).sum() * width)
+    emd = float((p.cumsum(0) - q.cumsum(0)).abs().sum() * width)
     return {
         "kl": kl,
         "js": js,
         "wasserstein_deg": emd,
-        "n_generated": int(np.asarray(generated).size),
-        "n_reference": int(np.asarray(reference).size),
+        "n_generated": int(torch.as_tensor(generated).numel()),
+        "n_reference": int(torch.as_tensor(reference).numel()),
         "bins": bins,
     }
 
 
-def _min_image_displacement(before, after) -> np.ndarray:
+def _min_image_displacement(before, after) -> torch.Tensor:
     """Cartesian displacement per atom, minimum-image and drift-corrected.
 
     A relaxation is free to translate the whole cell, and the benchmark's own
     metrics quotient that out, so the mean displacement is removed before the
     RMSD is taken.
     """
-    f0 = np.asarray(before.frac_coords, dtype=float)
-    f1 = np.asarray(after.frac_coords, dtype=float)
+    f0 = torch.tensor(before.frac_coords, dtype=torch.float64)
+    f1 = torch.tensor(after.frac_coords, dtype=torch.float64)
     df = f1 - f0
-    df -= np.round(df)
-    df -= df.mean(axis=0, keepdims=True)
-    df -= np.round(df)
-    return df @ np.asarray(after.lattice_mat, dtype=float)
+    df = df - df.round()
+    df = df - df.mean(dim=0, keepdim=True)
+    df = df - df.round()
+    return df @ torch.tensor(after.lattice_mat, dtype=torch.float64)
 
 
 def relaxation_displacement(
@@ -176,12 +217,22 @@ def relaxation_displacement(
 ) -> Dict[str, float]:
     """How far one generated structure moved to reach its local minimum."""
     d = _min_image_displacement(before, after)
-    norms = np.linalg.norm(d, axis=1)
-    v0 = float(abs(np.linalg.det(np.asarray(before.lattice_mat, dtype=float))))
-    v1 = float(abs(np.linalg.det(np.asarray(after.lattice_mat, dtype=float))))
+    norms = d.norm(dim=-1)
+    v0 = float(
+        torch.linalg.det(
+            torch.tensor(before.lattice_mat, dtype=torch.float64)
+        ).abs()
+    )
+    v1 = float(
+        torch.linalg.det(
+            torch.tensor(after.lattice_mat, dtype=torch.float64)
+        ).abs()
+    )
     out = {
-        "rmsd_angstrom": float(np.sqrt((norms**2).mean())),
-        "max_displacement_angstrom": float(norms.max()) if norms.size else 0.0,
+        "rmsd_angstrom": float(norms.pow(2).mean().sqrt()),
+        "max_displacement_angstrom": (
+            float(norms.max()) if norms.numel() else 0.0
+        ),
         "volume_change_frac": (v1 - v0) / v0 if v0 else float("nan"),
     }
     if energy_before is not None and energy_after is not None:

@@ -28,7 +28,7 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
+import torch
 
 from alignn.inverse.evaluate import (
     DEFAULT_ANGLE_CUTOFF,
@@ -91,10 +91,10 @@ def main():
         "angle_cutoff": args.cutoff,
         "angle_max_neighbors": args.max_neighbors,
         "generated_angle_mean_deg": (
-            float(np.mean(gen_angles)) if gen_angles.size else None
+            float(gen_angles.mean()) if gen_angles.numel() else None
         ),
         "reference_angle_mean_deg": (
-            float(np.mean(ref_angles)) if ref_angles.size else None
+            float(ref_angles.mean()) if ref_angles.numel() else None
         ),
     }
     d = metrics["angle_distribution"]
@@ -128,10 +128,15 @@ def main():
             )
         if rows:
             keys = sorted({k for r in rows for k in r})
-            summary = {
-                k: float(np.nanmean([r[k] for r in rows if k in r]))
-                for k in keys
-            }
+            summary = {}
+            for k in keys:
+                vals = torch.tensor(
+                    [r[k] for r in rows if k in r], dtype=torch.float64
+                )
+                vals = vals[torch.isfinite(vals)]
+                summary[k] = (
+                    float(vals.mean()) if vals.numel() else float("nan")
+                )
             summary["n_relaxed"] = len(rows)
             metrics["relaxation"] = summary
             print(

@@ -378,6 +378,17 @@ bash scripts/atombench/score.sh runs/bench/alignn_csp.csv
 `scripts/atombench/run_ablation.sh` runs the four pipeline variants (raw /
 rank / relax / full) so you can see what each stage contributes.
 
+Or skip the four commands above. `task_runners/` wraps each published result
+in one resumable task, with the arguments pinned, seeds handled and an sbatch
+script per task:
+
+```bash
+python task_runners/run_task.py tasks         # what is available
+python task_runners/run_task.py bench-jarvis  # train, generate, score, x3 seeds
+python task_runners/run_task.py bench-jarvis --aggregate --latex
+bash    task_runners/submit.sh  bench-jarvis  # the same, through SLURM
+```
+
 ## What actually moved the numbers
 
 Findings from the AtomBench runs, recorded so they are not rediscovered:

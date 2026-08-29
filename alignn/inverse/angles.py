@@ -66,7 +66,7 @@ leave the computational graph without any finite jump in the messages.
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 
@@ -198,20 +198,3 @@ def angle_denoising_loss(
     if weight is None:
         return per_triplet.mean()
     return (weight * per_triplet).sum() / weight.sum().clamp_min(1e-8)
-
-
-def angle_histogram(
-    angles_deg, bins: int = 180, lo: float = 0.0, hi: float = 180.0
-) -> Tuple:
-    """Normalised histogram of bond angles in degrees.
-
-    Kept here so the evaluation code and the tests share one definition.
-    """
-    import numpy as np
-
-    counts, edges = np.histogram(
-        np.asarray(angles_deg, dtype=float), bins=bins, range=(lo, hi)
-    )
-    total = counts.sum()
-    density = counts / total if total else counts.astype(float)
-    return density, edges

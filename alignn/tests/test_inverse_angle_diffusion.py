@@ -475,6 +475,44 @@ def test_angle_loss_gradient_reaches_the_shared_backbone():
     assert any(n.startswith("edge_embedding") for n in touched)
 
 
+def test_evaluation_angles_match_a_known_crystal():
+    """fcc has exactly 60, 90, 120 and 180 degree bond angles."""
+    from jarvis.core.atoms import Atoms
+
+    from alignn.inverse.evaluate import (
+        bond_angles_deg,
+        compare_angle_distributions,
+    )
+
+    fcc = Atoms(
+        lattice_mat=[[4.05, 0, 0], [0, 4.05, 0], [0, 0, 4.05]],
+        coords=[
+            [0.0, 0.0, 0.0],
+            [0.0, 0.5, 0.5],
+            [0.5, 0.0, 0.5],
+            [0.5, 0.5, 0.0],
+        ],
+        elements=["Al"] * 4,
+        cartesian=False,
+    )
+    angles = bond_angles_deg(fcc)
+    assert angles.numel() > 0
+    assert sorted({round(float(v), 1) for v in angles}) == [
+        60.0,
+        90.0,
+        120.0,
+        180.0,
+    ]
+    # A distribution is at zero distance from itself, and the Wasserstein
+    # distance is calibrated in degrees.
+    same = compare_angle_distributions(angles, angles)
+    assert same["wasserstein_deg"] == pytest.approx(0.0, abs=1e-9)
+    assert same["js"] == pytest.approx(0.0, abs=1e-12)
+    shifted = torch.linspace(80.0, 120.0, 5000)
+    moved = compare_angle_distributions(shifted + 5.0, shifted)
+    assert moved["wasserstein_deg"] == pytest.approx(5.0, abs=0.05)
+
+
 def test_bond_angle_matches_a_known_geometry():
     r_ij = torch.tensor([[1.0, 0.0, 0.0]])
     r_jk = torch.tensor([[1.0, 0.0, 0.0]])
