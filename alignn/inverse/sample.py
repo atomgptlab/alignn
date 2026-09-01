@@ -224,18 +224,40 @@ def to_jarvis_atoms(
     return out
 
 
+def denoiser_config_from_run(cfg: Dict) -> Dict:
+    """Denoiser keyword arguments recorded in a training run's config.
+
+    Checkpoints written before the angular channel existed simply lack the
+    new keys, and the denoiser defaults reproduce their original behaviour,
+    so old models keep loading unchanged.
+    """
+    out = {
+        "hidden_features": cfg["hidden_features"],
+        "alignn_layers": cfg["alignn_layers"],
+        "gcn_layers": cfg["gcn_layers"],
+        "knn": cfg["knn"],
+        "num_steps": cfg["num_steps"],
+    }
+    for key in (
+        "angle_diffusion",
+        "angle_feedback",
+        "topology",
+        "radius_cutoff",
+        "envelope_exponent",
+        "gate_pair_messages",
+        "angle_basis",
+    ):
+        if cfg.get(key) is not None:
+            out[key] = cfg[key]
+    return out
+
+
 def load_model(checkpoint_path, device, use_ema: bool = True):
     """Load an ALIGNN-CSP checkpoint into a ready-to-sample model."""
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     cfg = ckpt["config"]
     model = ALIGNNCSP(
-        denoiser_config={
-            "hidden_features": cfg["hidden_features"],
-            "alignn_layers": cfg["alignn_layers"],
-            "gcn_layers": cfg["gcn_layers"],
-            "knn": cfg["knn"],
-            "num_steps": cfg["num_steps"],
-        },
+        denoiser_config=denoiser_config_from_run(cfg),
         conditioner_spec=ckpt["conditioner_spec"],
     ).to(device)
     # Released checkpoints carry only the EMA weights, which are the ones

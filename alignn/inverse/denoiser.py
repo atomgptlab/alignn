@@ -18,6 +18,28 @@ the full symmetry group, so no equivariant machinery is required.
 The distinguishing ingredient relative to CSPNet / CDVAE / FlowMM denoisers is
 the ALIGNN line graph: bond *angles* are propagated alongside bond lengths,
 which is the three-body information that pins down coordination geometry.
+
+Two optional extensions turn that three-body information from a *feature* into
+a *generative channel*.  Both default to off, so the original model is
+recovered exactly by the default configuration.
+
+``angle_diffusion``
+    Adds a per-triplet head predicting the angular displacement the forward
+    process introduced, trained with FoldingDiff's wrapped smooth-L1
+    objective.  The head reads the line-graph feature ``z`` of the shared
+    backbone, and ``z`` reaches the coordinate and lattice heads through
+    ALIGNN's ordinary ``angles -> bonds -> atoms`` path, so the angular
+    channel is coupled rather than merely supervised.  ``angle_feedback=False``
+    cuts that coupling for the control ablation.
+
+``topology="radius"``
+    Replaces the hard k-nearest-neighbour rule that decides which bonds may
+    form triplets with a radius candidate set plus a DimeNet cutoff envelope
+    and a ReaxFF-style product gate, so the line graph changes continuously as
+    the coordinates denoise instead of jumping when two neighbours swap rank.
+
+See :mod:`alignn.inverse.angles` for the literature these follow and for the
+one place where this deviates from FoldingDiff.
 """
 
 from __future__ import annotations
@@ -28,16 +50,29 @@ from typing import Dict, Optional, Tuple
 import torch
 from torch import nn
 
-from alignn.models.alignn_atomwise_pure import (
-    ALIGNNConvPure,
-    EdgeGatedGraphConvPure,
-    scatter_mean,
-    scatter_sum,
+from alignn.models.alignn_atomwise_pure import scatter_mean, scatter_sum
+from alignn.models.alignn_atomwise_pure_smooth import (
+    CutoffPolynomial,
+    FourierAngular,
 )
 from alignn.models.utils import MLPLayer, RBFExpansion
 from alignn.torch_graph_builder import _line_graph_edges, torch_bond_cosines
 
+from alignn.inverse.angles import bond_angle, triplet_relevance
 from alignn.inverse.diffusion import wrap_diff
+from alignn.inverse.layers import (
+    WeightedALIGNNConv,
+    WeightedEdgeGatedGraphConv,
+)
+
+#: Line-graph topologies.  ``knn`` is the original hard neighbour-rank rule;
+#: ``radius`` is the smooth construction of section 4 of the design brief.
+TOPOLOGIES = ("knn", "radius")
+
+#: Angular input bases.  ``cosine_rbf`` is ALIGNN's own; ``fourier`` is the
+#: learnable Fourier basis on theta already shipped in this repository, and is
+#: reserved for the A6 basis ablation.
+ANGLE_BASES = ("cosine_rbf", "fourier")
 
 
 def sinusoidal_embedding(x: torch.Tensor, dim: int, max_period: float = 1e4):
@@ -112,6 +147,29 @@ def _image_offsets(device, dtype):
     return torch.cartesian_prod(r, r, r)  # (27, 3)
 
 
+def _angle_basis_layers(kind, triplet_bins, embedding_features, hidden):
+    """Layers expanding a bond-angle cosine to a hidden-size feature.
+
+    ``cosine_rbf`` is ALIGNN's own representation and is left byte-for-byte
+    as it was; ``fourier`` swaps in the learnable Fourier basis on theta that
+    this repository already carries, and exists only for the A6 ablation.
+    DimeNet's joint spherical Fourier-Bessel distance-angle basis is *not*
+    implemented here — see the ablation notes.
+    """
+    if kind == "fourier":
+        order = max(1, (triplet_bins - 1) // 2)
+        basis = FourierAngular(order=order)
+        n_in = basis.out_features
+    else:
+        basis = RBFExpansion(vmin=-1.0, vmax=1.0, bins=triplet_bins)
+        n_in = triplet_bins
+    return [
+        basis,
+        MLPLayer(n_in, embedding_features),
+        MLPLayer(embedding_features, hidden),
+    ]
+
+
 class ALIGNNCSPDenoiser(nn.Module):
     """Predict (coordinate score, lattice noise) for a noised crystal."""
 
@@ -129,12 +187,84 @@ class ALIGNNCSPDenoiser(nn.Module):
         num_species: int = 120,
         num_steps: int = 1000,
         score_channels: int = 32,
+        angle_diffusion: bool = False,
+        angle_feedback: bool = True,
+        topology: str = "knn",
+        radius_cutoff: float = 5.0,
+        envelope_exponent: int = 5,
+        gate_pair_messages: bool = False,
+        angle_basis: str = "cosine_rbf",
     ):
+        """Build the denoiser.
+
+        Parameters beyond the original set, all defaulting to the original
+        behaviour:
+
+        angle_diffusion
+            Emit an angular denoising prediction per triplet.  Requires
+            ``alignn_layers > 0``, since the line graph is what carries
+            angles.
+        angle_feedback
+            Whether the angular features are allowed to reach the bond (and
+            hence atom, coordinate and lattice) representations.  ``False`` is
+            ablation A4: angular supervision on a shared trunk with the
+            architectural coupling removed.
+        topology
+            ``"knn"`` keeps the original rule — a bond may join a triplet if
+            it is among the ``knn`` shortest bonds at its destination atom.
+            ``"radius"`` replaces it with every bond shorter than
+            ``radius_cutoff``, each weighted by the DimeNet envelope, with
+            triplets weighted by the product of their two bonds' weights.
+        radius_cutoff, envelope_exponent
+            Cutoff radius and polynomial order of that envelope.  The default
+            5 A sits between this repository's own three-body cutoff (3.5 A)
+            and DimeNet's molecular cutoff (5 A), and is close to the radius
+            the baseline's 12 nearest neighbours actually span in a crystal,
+            which keeps the A1-vs-A3 comparison fair.
+        gate_pair_messages
+            Also weight the *pair* channel — the atom-graph messages and the
+            per-edge terms of the coordinate score — by ``s_ij``.  The pair
+            graph is dense rather than neighbour-ranked, so nothing is ever
+            inserted or deleted there and this is not needed for continuity;
+            it is the fuller reading of "smoothly vanishing pair
+            interactions" and is switched on by the smooth-topology
+            ablations.
+        angle_basis
+            ``"cosine_rbf"`` is ALIGNN's own angular representation and is
+            what every primary experiment uses.  ``"fourier"`` is reserved
+            for the A6 basis ablation.
+        """
         super().__init__()
+        if topology not in TOPOLOGIES:
+            raise ValueError(
+                f"topology must be one of {TOPOLOGIES}, got {topology!r}"
+            )
+        if angle_basis not in ANGLE_BASES:
+            raise ValueError(
+                f"angle_basis must be one of {ANGLE_BASES}, "
+                f"got {angle_basis!r}"
+            )
+        if angle_diffusion and alignn_layers <= 0:
+            raise ValueError(
+                "angle_diffusion needs alignn_layers > 0: the angular "
+                "channel lives on the line graph, which is not built when "
+                "there are no ALIGNN layers"
+            )
+        if gate_pair_messages and topology != "radius":
+            raise ValueError(
+                "gate_pair_messages requires topology='radius'; the gate is "
+                "the radius envelope"
+            )
         self.hidden_features = hidden_features
         self.fourier_k = fourier_k
         self.knn = knn
         self.num_steps = num_steps
+        self.angle_diffusion = angle_diffusion
+        self.angle_feedback = angle_feedback
+        self.topology = topology
+        self.radius_cutoff = radius_cutoff
+        self.gate_pair_messages = gate_pair_messages
+        self.angle_basis = angle_basis
 
         self.species_embedding = nn.Embedding(num_species, hidden_features)
 
@@ -166,23 +296,36 @@ class ALIGNNCSPDenoiser(nn.Module):
         self.use_line_graph = alignn_layers > 0
         self.angle_embedding = (
             nn.Sequential(
-                RBFExpansion(vmin=-1.0, vmax=1.0, bins=triplet_bins),
-                MLPLayer(triplet_bins, embedding_features),
-                MLPLayer(embedding_features, hidden_features),
+                *_angle_basis_layers(
+                    angle_basis,
+                    triplet_bins,
+                    embedding_features,
+                    hidden_features,
+                )
             )
             if self.use_line_graph
+            else None
+        )
+        # DimeNet's polynomial cutoff envelope, already implemented in this
+        # repository for the smooth property model; u, u' and u'' all vanish
+        # at the cutoff.
+        self.envelope = (
+            CutoffPolynomial(
+                cutoff=radius_cutoff, coeff=float(envelope_exponent)
+            )
+            if topology == "radius"
             else None
         )
 
         self.alignn_layers = nn.ModuleList(
             [
-                ALIGNNConvPure(hidden_features, hidden_features)
+                WeightedALIGNNConv(hidden_features, hidden_features)
                 for _ in range(alignn_layers)
             ]
         )
         self.gcn_layers = nn.ModuleList(
             [
-                EdgeGatedGraphConvPure(hidden_features, hidden_features)
+                WeightedEdgeGatedGraphConv(hidden_features, hidden_features)
                 for _ in range(gcn_layers)
             ]
         )
@@ -210,11 +353,28 @@ class ALIGNNCSPDenoiser(nn.Module):
             nn.SiLU(),
             nn.Linear(hidden_features, 6),
         )
+        # Angular denoising head. Reads the line-graph feature of the shared
+        # backbone, so nothing about it is a second network: it is one more
+        # output head on the representation that already denoises coordinates
+        # and lattice.
+        self.angle_head = (
+            nn.Sequential(
+                nn.Linear(hidden_features, hidden_features),
+                nn.SiLU(),
+                nn.Linear(hidden_features, 1),
+            )
+            if angle_diffusion
+            else None
+        )
+
         # Start from a near-zero prediction: diffusion training is much better
         # behaved when the model does not begin by shouting.
         nn.init.zeros_(self.score_combine.weight)
         nn.init.zeros_(self.lattice_head[-1].weight)
         nn.init.zeros_(self.lattice_head[-1].bias)
+        if self.angle_head is not None:
+            nn.init.zeros_(self.angle_head[-1].weight)
+            nn.init.zeros_(self.angle_head[-1].bias)
 
     # ── geometry ─────────────────────────────────────────────────────────
     def _edge_geometry(
@@ -224,9 +384,23 @@ class ALIGNNCSPDenoiser(nn.Module):
         src: torch.Tensor,
         dst: torch.Tensor,
         edge_graph_id: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Return wrapped Δf, min-image Δf, min-image Cartesian vec, dist."""
-        df = wrap_diff(frac[dst] - frac[src])
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        """Return wrapped Δf, min-image Δf, Cartesian vec, dist, image.
+
+        ``image`` is the integer cell offset ``n`` this resolution settled on,
+        i.e. the one for which ``Δf = f[dst] - f[src] + n``.  The angular
+        target needs it: re-applying the same ``n`` to the *clean* structure
+        is what makes the target the corruption of one fixed triplet identity
+        instead of a comparison between two different neighbours.
+        """
+        raw = frac[dst] - frac[src]
+        df = wrap_diff(raw)
         offsets = _image_offsets(frac.device, frac.dtype)  # (27, 3)
         cand = df.unsqueeze(1) + offsets.unsqueeze(0)  # (E, 27, 3)
         lat_e = lattice[edge_graph_id]  # (E, 3, 3)
@@ -244,7 +418,15 @@ class ALIGNNCSPDenoiser(nn.Module):
         # The fractional difference for the *same* image, which is what the
         # coordinate score head combines.
         df_min = cand.gather(1, idx).squeeze(1)  # (E, 3)
-        return df, df_min, r, d_all.gather(1, best.view(-1, 1)).squeeze(1)
+        # cand = (raw - round(raw)) + offset, so the total integer shift is:
+        image = offsets[best] - torch.round(raw)  # (E, 3)
+        return (
+            df,
+            df_min,
+            r,
+            d_all.gather(1, best.view(-1, 1)).squeeze(1),
+            image,
+        )
 
     def _fourier(self, df: torch.Tensor) -> torch.Tensor:
         """Fourier features of a fractional difference (periodic, signed)."""
@@ -274,15 +456,28 @@ class ALIGNNCSPDenoiser(nn.Module):
         ``cond_embedding`` is a ``(B, hidden_features)`` vector produced by a
         :class:`~alignn.inverse.conditioners.MultiModalConditioner` — the
         denoiser is deliberately agnostic to which modalities went into it.
+
+        With ``angle_diffusion`` on, the returned dict carries an extra
+        ``"angle"`` entry holding the per-triplet prediction and everything
+        the loss needs to build its target: the angles at the *noised*
+        geometry, the triplet relevance weights, and the edge/triplet indices
+        together with the periodic images the geometry was resolved against.
         """
         num_nodes = frac.shape[0]
         if pair_index is None:
             pair_index = dense_pair_index(natoms)
         src, dst, edge_graph_id = pair_index
 
-        df, df_min, r, dist = self._edge_geometry(
+        df, df_min, r, dist, image = self._edge_geometry(
             frac, lattice, src, dst, edge_graph_id
         )
+
+        # Smooth pair relevance s_ij = u(r_ij; r_c). Recomputed from the
+        # current coordinates and lattice on every call, which is what makes
+        # the topology follow the geometry through reverse diffusion rather
+        # than being fixed up front.
+        s_edge = None if self.envelope is None else self.envelope(dist)
+        edge_w = s_edge if self.gate_pair_messages else None
 
         # Node features: species + timestep + conditioning + lattice state.
         h = self.species_embedding(atomic_numbers)
@@ -305,24 +500,74 @@ class ALIGNNCSPDenoiser(nn.Module):
         y = self.edge_embedding(
             torch.cat([self.rbf(dist), self._fourier(df)], dim=-1)
         )
+        angle_out: Optional[Dict[str, torch.Tensor]] = None
         if self.use_line_graph:
-            allowed = _knn_mask(dist, dst, num_nodes, self.knn)
+            if s_edge is None:
+                # Original topology: a bond may join a triplet if it is among
+                # the k shortest at its destination atom.
+                allowed = _knn_mask(dist, dst, num_nodes, self.knn)
+            else:
+                # Radius candidate set. s_ij is exactly zero at and beyond
+                # r_c, so dropping those bonds removes only terms that
+                # already contributed nothing.
+                allowed = s_edge > 0.0
             lg_src, lg_dst = _line_graph_edges(
                 src, dst, num_nodes, allowed=allowed
             )
-            z = self.angle_embedding(torch_bond_cosines(r[lg_src], r[lg_dst]))
+            # ReaxFF-style product gate: an angle fades out when either of
+            # its two bonds does.
+            tri_w = (
+                None
+                if s_edge is None
+                else triplet_relevance(s_edge, lg_src, lg_dst)
+            )
+            cos_theta = torch_bond_cosines(r[lg_src], r[lg_dst])
+            z = self.angle_embedding(cos_theta)
+            # A4: keep the angular features evolving and supervised, but stop
+            # them from reaching the bond representation.
+            conv_tri_w = tri_w
+            if not self.angle_feedback:
+                conv_tri_w = torch.zeros_like(cos_theta)
             for layer in self.alignn_layers:
                 h, y, z = layer.forward_tensors(
-                    src, dst, num_nodes, lg_src, lg_dst, y.shape[0], h, y, z
+                    src,
+                    dst,
+                    num_nodes,
+                    lg_src,
+                    lg_dst,
+                    y.shape[0],
+                    h,
+                    y,
+                    z,
+                    edge_w,
+                    conv_tri_w,
                 )
+            if self.angle_head is not None:
+                angle_out = {
+                    "eps": self.angle_head(z).squeeze(-1),
+                    "theta_t": bond_angle(r[lg_src], r[lg_dst]),
+                    "weight": (
+                        torch.ones_like(cos_theta) if tri_w is None else tri_w
+                    ),
+                    "lg_src": lg_src,
+                    "lg_dst": lg_dst,
+                    "src": src,
+                    "dst": dst,
+                    "image": image,
+                    "edge_graph_id": edge_graph_id,
+                }
         for layer in self.gcn_layers:
-            h, y = layer.forward_tensors(src, dst, num_nodes, h, y)
+            h, y = layer.forward_tensors(src, dst, num_nodes, h, y, edge_w)
 
         # Coordinate score: sum the fractional edge offsets into their
         # destination atom, each weighted by a learned per-edge scalar.
         w = self.edge_weight_mlp(
             torch.cat([h[src], h[dst], y], dim=-1)
         )  # (E, C)
+        if edge_w is not None:
+            # Same continuity requirement as the messages: a pair leaving the
+            # cutoff must stop contributing smoothly, not abruptly.
+            w = w * edge_w.view(-1, 1)
         contrib = w.unsqueeze(-1) * df_min.unsqueeze(1)  # (E, C, 3)
         per_node = scatter_sum(contrib, dst, num_nodes)  # (N, C, 3)
         eps_frac = self.score_combine(per_node.transpose(1, 2)).squeeze(
@@ -331,4 +576,7 @@ class ALIGNNCSPDenoiser(nn.Module):
 
         pooled = scatter_mean(h, node_graph_id, int(natoms.shape[0]))
         eps_lattice = self.lattice_head(pooled)
-        return {"eps_frac": eps_frac, "eps_lattice": eps_lattice}
+        out: Dict = {"eps_frac": eps_frac, "eps_lattice": eps_lattice}
+        if angle_out is not None:
+            out["angle"] = angle_out
+        return out

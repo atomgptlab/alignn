@@ -14,6 +14,21 @@ The pieces:
 ``data``       dataset / collation from the AtomBench split JSONs.
 ``sample``     ancestral + Langevin-corrector sampling with classifier-free
                guidance on the conditioning property.
+``angles``     bond-angle denoising target and the smooth (DimeNet envelope /
+               ReaxFF product gate) triplet topology.
+``layers``     ALIGNN convolutions taking an optional per-edge or per-triplet
+               weight, so a message can fade out instead of being deleted.
+``ablations``  named configurations for the angular-diffusion ablation suite.
+``evaluate``   bond-angle distribution and relaxation-displacement metrics.
 """
 
-__all__ = ["data", "denoiser", "diffusion", "sample"]
+__all__ = [
+    "ablations",
+    "angles",
+    "data",
+    "denoiser",
+    "diffusion",
+    "evaluate",
+    "layers",
+    "sample",
+]
