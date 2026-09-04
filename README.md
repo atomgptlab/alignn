@@ -335,8 +335,10 @@ choice takes from the literature, and the bibliography.
 ## Performances
 
 ALIGNN 2.0 benchmarked across single-property, multi-property (spectra / per-atom /
-tensor), and interatomic-force-field tasks. Columns compare ALIGNN 2.0 on the radius
-and 8 Å kNN graphs against the original ALIGNN and CGCNN; **bold** marks the row best.
+tensor), and interatomic-force-field tasks — the latter including universal-potential
+stability on Matbench-Discovery / WBM (256,963 materials) and the CHIPS-FF
+material-property suite (lattice, elastic, vacancy, surface). Columns compare ALIGNN 2.0
+on the radius and 8 Å kNN graphs against the original ALIGNN and CGCNN; **bold** marks the row best.
 Skill is `100 · (1 − MAE / MAD)` vs the mean-absolute-deviation baseline. For the live,
 continually-updated numbers see the
 [JARVIS-Leaderboard](https://atomgptlab.github.io/jarvis_leaderboard/).
@@ -348,10 +350,10 @@ continually-updated numbers see the
 
 | # | Task (unit) | N tr/val/te | ALIGNN 2.0 (radius) | ALIGNN 2.0 (kNN) | orig. ALIGNN | CGCNN | Baseline (MAD) | Skill % |
 |---|---|---|---|---|---|---|---|---|
-| 1 | formation_energy (eV/atom) | 44569/5572/5572 | 0.0316 | **0.0307** | 0.0331 | 0.0551 | 0.876 | 96.5 |
-| 2 | optb88vdw_total_energy (eV/atom) | 44569/5572/5572 | 0.0321 | **0.0314** | 0.0367 | 0.0584 | 1.786 | 98.2 |
-| 3 | optb88vdw_bandgap (eV) | 44569/5572/5572 | 0.1314 | **0.1306** | 0.1423 | 0.1857 | 0.999 | 86.9 |
-| 4 | mbj_bandgap (eV) | 14535/1817/1815 | **0.2721** | 0.2730 | 0.3104 | 0.3261 | 1.765 | 84.6 |
+| 1 | formation_energy (eV/atom) | 44569/5572/5572 | 0.0316 | **0.0284** | 0.0331 | 0.0551 | 0.876 | 96.8 |
+| 2 | optb88vdw_total_energy (eV/atom) | 44569/5572/5572 | 0.0321 | **0.0297** | 0.0367 | 0.0584 | 1.786 | 98.3 |
+| 3 | optb88vdw_bandgap (eV) | 44569/5572/5572 | 0.1314 | **0.1245** | 0.1423 | 0.1857 | 0.999 | 87.5 |
+| 4 | mbj_bandgap (eV) | 14535/1817/1815 | 0.2721 | **0.2576** | 0.3104 | 0.3261 | 1.765 | 85.4 |
 | 5 | QM9 HOMO–LUMO gap (eV) | 110,000/10,000/10,829 | **0.031** |   | 0.0345 |   | 0.834 | 96.3 |
 | 6 | QMOF bandgap (eV) | 16,340/2042/2042 | 0.208 |   | **0.202** |   | 0.946 | 78.7 |
 | 7 | ehull (eV/atom) | 44290/5537/5537 | **0.0576** | 0.0590 | 0.0763 | 0.0590 | 1.148 | 95.0 |
@@ -381,11 +383,11 @@ continually-updated numbers see the
 | 31 | Tc_supercon (K) | 556/30/30 | 1.637 | **1.490** | 2.032 | – | 2.723 | 45.3 |
 | 32 | Tc_supercon_hydride (K) | 763/95/95 | 9.937 | **9.425** | – | – | 33.56 | 71.9 |
 | 33 | Tc_supercon_ hydride_plus_bulk (K) | 1595/199/199 | 8.670 | **8.407** | – | – | 22.33 | 62.3 |
-| 34 | alex_supercon Tc (K) | 6592/824/825 | **0.883** |   |   |   | 2.818 | 68.7 |
-| 35 | alex_supercon N(E_F) (states/eV) | 6592/824/825 | **0.821** |   |   |   | 1.559 | 47.3 |
-| 36 | alex_supercon θ_D (K) | 6592/824/825 | **11.33** |   |   |   | 80.30 | 85.9 |
-| 37 | alex_supercon λ | 6592/824/825 | **0.0707** |   |   |   | 0.194 | 63.6 |
-| 38 | alex_supercon ω_log (K) | 6592/824/825 | **20.31** |   |   |   | 55.37 | 63.3 |
+| 34 | alex_supercon Tc (K) | 6592/824/825 | 0.883 | **0.864** |   |   | 2.818 | 69.3 |
+| 35 | alex_supercon N(E_F) (states/eV) | 6592/824/825 | 0.821 | **0.791** |   |   | 1.559 | 49.3 |
+| 36 | alex_supercon θ_D (K) | 6592/824/825 | 11.33 | **10.68** |   |   | 80.30 | 86.7 |
+| 37 | alex_supercon λ | 6592/824/825 | 0.0707 | **0.0679** |   |   | 0.194 | 65.0 |
+| 38 | alex_supercon ω_log (K) | 6592/824/825 | 20.31 | **20.08** |   |   | 55.37 | 63.7 |
 
 **(b) Multi-property — spectra / per-atom / tensor; held-out MAE (col. "radius")**
 
@@ -408,13 +410,70 @@ continually-updated numbers see the
 |---|---|---|---|---|---|---|---|---|
 | 49 | `mlearn`-Si, energy (meV/atom) | 214/–/25 | 13.88‡ |   |   |   | – |   |
 | 50 | `mlearn`-Si, force (eV/Å) | 214/–/25 | 0.0872‡ |   |   |   | – |   |
-| 51 | ALIGNN-FF-DB (E/F) | 276,401/–/15,355 | 32.4† / 0.0564† |   |   |   | – |   |
+| 51 | ALIGNN-FF-DB (E/F) | 276,401/–/15,355 | 32.4 / 0.0564 |   |   |   | – |   |
 | 52 | MATPES-PBE (E/F) | 391,241/21,736/– | 40.4 / 0.1475 |   |   |   | – |   |
-| 53 | FD-FF, 1.1 M (E/F) | 1,097,227/60,957/60,958 | 28.9† / 0.0445† |   |   |   | – |   |
-| 54 | MPtrj (E/F) | ~1.5 M | 56.7† / 0.0707† |   |   |   | – |   |
+| 53 | FD-FF, 1.1 M (E/F) | 1,097,227/60,957/60,958 | 28.9 / 0.0445 |   |   |   | – |   |
+| 54 | MPtrj (E/F, ep46) | ~1.5 M | 57.9 / 0.0721 |   |   |   | – |   |
 *Blank cells: not run for that graph/model. `–`: baseline unavailable or ill-defined.
-† still training. ‡ `mlearn` MAE pending re-verification against a consistent per-atom
-energy convention.*
+‡ `mlearn` MAE pending re-verification against a consistent per-atom energy convention.*
+
+**(d) Universal force fields — Matbench-Discovery / WBM (full 256,963-material set)**
+
+Five ALIGNN-FF (AFF) variants share one architecture; UMA / M3GNet / MACE-MP-0 /
+CHGNet are external baselines run through the identical pipeline. Stability F1 and
+discovery-acceleration DAF are higher-is-better; geometry-optimization RMSD, formation
+MAE, and diatomic tortuosity τ (ideal 1) are lower-is-better.
+
+| Model | E MAE (meV/at) | F MAE (eV/Å) | E_f MAE (eV/at) | F1 ↑ | DAF ↑ | WBM RMSD ↓ | τ |
+|---|---|---|---|---|---|---|---|
+| AFF MATPES-R2SCAN | 48.7 | 0.163 | 0.243 | 0.380 | 1.51 | 0.102 | 1.02 |
+| AFF MATPES-PBE | 40.4 | 0.148 | 0.183 | 0.388 | 2.02 | 0.101 | **1.01** |
+| AFF JV-DFT-DB1 | 32.4 | 0.0564 | 0.163 | 0.389 | 1.66 | 0.143 | 1.04 |
+| AFF JV-DFT-DB2 | **28.9** | **0.0445** | 0.182 | 0.375 | 1.60 | 0.148 | 1.23 |
+| AFF MPtrj (ep46) | 57.9 | 0.0721 | 0.174 | 0.453 | 1.86 | 0.118 | 1.03 |
+| UMA (uma-s-1p1) | – | – | 0.125 | **0.575** | **3.58** | **0.067** | 2.53 |
+| M3GNet (MatPES-PBE) | – | – | 0.129 | 0.401 | 1.81 | 0.101 | 1.05 |
+| MACE-MP-0 | – | – | 0.143 | 0.430 | 2.08 | 0.097 | 1.60 |
+| CHGNet | – | – | 0.098 | 0.459 | 1.84 | 0.101 | 9.63 |
+
+**(e) Universal force fields — CHIPS-FF material properties** (MAE vs JARVIS-DFT; single relax-and-evaluate)
+
+Lattice `a,c`; formation `E_f`; elastic `C11,C44,Kv`; monovacancy (Vac) and surface (Surf) energies.
+
+| Model | a (Å) | c (Å) | E_f (eV/at) | C11 (GPa) | C44 (GPa) | Kv (GPa) | Vac (eV) | Surf (J/m²) |
+|---|---|---|---|---|---|---|---|---|
+| AFF MATPES-R2SCAN | 0.056 | 0.094 | 0.159 | 41.5 | 33.9 | 128.1 | 0.790 | 0.418 |
+| AFF MATPES-PBE | **0.025** | 0.063 | 0.081 | 51.5 | 33.9 | 95.7 | 1.036 | 0.618 |
+| AFF JV-DFT-DB1 | 0.041 | 0.058 | 0.031 | 154.1 | 64.0 | 51.3 | 1.926 | 1.313 |
+| AFF JV-DFT-DB2 | **0.025** | **0.029** | **0.027** | 144.9 | 50.0 | **50.2** | 1.899 | 1.194 |
+| AFF MPtrj (ep46) | 0.031 | 0.047 | 0.190 | 68.9 | 46.9 | 105.4 | 1.630 | 0.948 |
+| MACE-MP-0 | 0.028 | 0.084 | 0.104 | 42.4 | 38.0 | 94.2 | 1.012 | 0.359 |
+| CHGNet | 0.035 | 0.083 | 0.142 | 59.3 | 46.9 | 85.6 | 1.235 | 0.666 |
+| UMA-S | 0.026 | **0.029** | 0.076 | **29.7** | 35.2 | 85.3 | **0.464** | **0.122** |
+| M3GNet-MatPES-PBE | 0.038 | 0.049 | 0.148 | 49.3 | **33.2** | 83.5 | 0.928 | 0.297 |
+
+**(f) Inverse design — ALIGNN-CSP crystal-structure reconstruction** (AtomBench protocol)
+
+Conditional generation scored against the target structure: match rate ↑, coordinate
+RMSD / composition-conditioned ccRMSD / lattice KLD ↓. Baselines from AtomBench;
+ALIGNN-CSP is the mean over six models on JARVIS (best single run in parentheses) and a
+single run on Alexandria.
+
+| Model | Match ↑ | RMSD (Å) ↓ | ccRMSD ↓ | KLD ↓ |
+|---|---|---|---|---|
+| *JARVIS Supercon-3D (103 targets)* | | | | |
+| AtomGPT | **0.490** | 0.082 | 0.826 | 0.020 |
+| CDVAE | 0.359 | 0.408 | 1.156 | **0.011** |
+| FlowMM | 0.029 | 0.408 | 1.539 | 0.036 |
+| MatterGen | 0.466 | 0.039 | **0.485** | 0.029 |
+| **ALIGNN-CSP** (this work) | 0.471 | **0.031** | 0.506 | 0.023 |
+| &nbsp;&nbsp;best single run | (0.524) | (0.023) | (0.470) | (0.018) |
+| *Alexandria DS-A/B (825 targets)* | | | | |
+| AtomGPT | 0.502 | 0.038 | 0.522 | 0.022 |
+| CDVAE | 0.356 | 0.418 | 1.222 | **0.012** |
+| FlowMM | 0.090 | 0.381 | 1.400 | 0.038 |
+| MatterGen | **0.628** | **0.014** | **0.238** | 0.024 |
+| **ALIGNN-CSP** (this work) | 0.485 | 0.028 | 0.343 | 0.023 |
 </details>
 
 <a name="notes"></a>
