@@ -185,9 +185,12 @@ class TrainingConfig(BaseSettings):
     batch_size: int = 64
     gpu_memory_fraction: Optional[float] = None
     use_amp: bool = False  # bf16 mixed precision (A100/H100/RTX 30+)
-    # DDP tuning. find_unused_parameters=True is slow; enable only if
-    # your model has conditional branches whose gradients vary per step.
-    ddp_find_unused_parameters: bool = False
+    # DDP tuning. On by default because the last ALIGNN and GCN layers
+    # compute edge/triplet updates that nothing downstream reads, so their
+    # batch-norm parameters never receive a gradient and DDP aborts on the
+    # second iteration without this. The per-step cost is small for models
+    # of this size; set False only after removing those dead outputs.
+    ddp_find_unused_parameters: bool = True
     # Resume optimizer/scheduler/epoch from <output_dir>/current_state.pt if
     # present. Lets a run that hit the walltime continue with a single
     # continuous LR schedule instead of restarting it (weights alone are
