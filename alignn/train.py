@@ -680,7 +680,10 @@ def train_dgl(
                         "epoch": e + 1,
                         "optimizer": optimizer.state_dict(),
                         "scheduler": scheduler.state_dict(),
-                        "best_loss": best_loss,
+                        # this epoch's val loss is compared with
+                        # best_loss only below, so count it here too or a
+                        # resumed run restores a best one epoch stale
+                        "best_loss": min(best_loss, val_loss),
                     },
                     os.path.join(config.output_dir, "current_state.pt"),
                 )
