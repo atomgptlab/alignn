@@ -548,6 +548,10 @@ def train_dgl(
             for dats, jid in zip(val_loader, val_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
+                # release the previous batch's autograd graph before the
+                # forward pass: with no backward() here, result/loss keep
+                # the create_graph force graph alive, doubling peak memory
+                result = loss = loss1 = loss2 = loss3 = loss4 = loss5 = None
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
                     result = net(
@@ -801,6 +805,10 @@ def train_dgl(
             for dats, jid in zip(test_loader, test_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
+                # release the previous batch's autograd graph before the
+                # forward pass: with no backward() here, result/loss keep
+                # the create_graph force graph alive, doubling peak memory
+                result = loss = loss1 = loss2 = loss3 = loss4 = loss5 = None
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
                     result = eval_net(
