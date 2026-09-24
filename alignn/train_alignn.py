@@ -462,7 +462,14 @@ def train_for_folder(
         read_existing=config.read_existing,
         dtype=config.dtype,
     )
-    # print("dataset", dataset[0])
+    # The loaders now read from the LMDB caches, so the parsed dataset
+    # list is dead weight. data.py frees its own references, but this
+    # one keeps every structure dict alive for the whole training run
+    # (tens of GB for million-entry force-field datasets).
+    dataset = None
+    import gc
+
+    gc.collect()
     t1 = time.time()
     # world_size = torch.cuda.device_count()
     print("rank", rank)
