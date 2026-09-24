@@ -371,8 +371,10 @@ def get_train_val_loaders(
                 print("Data error", exp)
                 pass
 
+        # Sharding is driven by these samplers, which the loaders below
+        # receive directly; the old `use_ddp=` flag is gone because the
+        # no-DGL fallback dropped it and every rank then read the whole set.
         if world_size > 1:
-            use_ddp = True
             train_sampler = DistributedSampler(
                 dataset_train, num_replicas=world_size, rank=rank
             )
@@ -380,7 +382,6 @@ def get_train_val_loaders(
                 dataset_val, num_replicas=world_size, rank=rank
             )
         else:
-            use_ddp = False
             train_sampler = None
             val_sampler = None
         tmp_name = filename + "train_data"
@@ -479,12 +480,18 @@ def get_train_val_loaders(
             # train_loader = DataLoader(
             train_data,
             batch_size=batch_size,
-            shuffle=True,
+            # a sampler and shuffle=True are mutually exclusive; the
+            # DistributedSampler shuffles internally (see set_epoch in
+            # train.py). use_ddp stays False because the sharding is ours:
+            # the no-DGL fallback drops that flag entirely, so relying on it
+            # silently gave every rank the full dataset.
+            shuffle=(train_sampler is None),
+            sampler=train_sampler,
             collate_fn=collate_fn,
             drop_last=True,
             num_workers=workers,
             pin_memory=pin_memory,
-            use_ddp=use_ddp,
+            use_ddp=False,
             persistent_workers=(workers > 0),
             prefetch_factor=2 if workers > 0 else None,
         )
@@ -505,6 +512,7 @@ def get_train_val_loaders(
             val_data,
             batch_size=batch_size,
             shuffle=False,
+            sampler=val_sampler,
             collate_fn=collate_fn,
             # Never drop the val tail: with a small val set and a large
             # batch size, drop_last=True silently empties the loader and
@@ -512,7 +520,7 @@ def get_train_val_loaders(
             drop_last=False,
             num_workers=workers,
             pin_memory=pin_memory,
-            use_ddp=use_ddp,
+            use_ddp=False,
             persistent_workers=(workers > 0),
             prefetch_factor=2 if workers > 0 else None,
         )
@@ -538,7 +546,9 @@ def get_train_val_loaders(
                 drop_last=False,
                 num_workers=workers,
                 pin_memory=pin_memory,
-                use_ddp=use_ddp,
+                # never sharded: the final test pass runs on rank 0 only
+                # (train.py guards it), so every rank keeps the full set
+                use_ddp=False,
             )
             if test_data is not None
             else None

@@ -424,6 +424,12 @@ def train_for_folder(
         prepare_batch,
     ) = get_train_val_loaders(
         dataset_array=dataset,
+        # Without these the loader builder keeps its world_size=0 default, no
+        # DistributedSampler is created, and every rank iterates the WHOLE
+        # training set: N GPUs then cost N times the work for one epoch's
+        # progress instead of splitting it.
+        rank=rank,
+        world_size=world_size,
         target="target",
         target_atomwise=target_atomwise,
         target_grad=target_grad,

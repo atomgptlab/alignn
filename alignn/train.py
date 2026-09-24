@@ -366,6 +366,15 @@ def train_dgl(
                         best_loss,
                     )
         for e in range(start_epoch, config.epochs):
+            # A DistributedSampler shuffles from a seed derived from the epoch
+            # number, so without this every epoch replays the same order and
+            # each rank sees the same slice all run long.
+            for _loader in (train_loader, val_loader):
+                _set_epoch = getattr(
+                    getattr(_loader, "sampler", None), "set_epoch", None
+                )
+                if _set_epoch is not None:
+                    _set_epoch(e)
             train_init_time = time.time()
             running_loss = 0
             running_loss1 = 0
@@ -714,7 +723,11 @@ def train_dgl(
                         data=val_result,
                     )
                 best_model = net
-            if ema_state is not None and is_main:
+            if ema_state is not None:
+                # Every rank evaluates its own val shard and the losses are
+                # averaged, as for val_loss above: rank 0 alone would score
+                # the EMA weights on 1/N of the val set and then compare
+                # that with the full-set best_loss in eval_best_checkpoint.
                 module = _unwrap(net)
                 backup = {
                     k: v.detach().clone()
@@ -725,14 +738,16 @@ def train_dgl(
                     module, val_loader, config, device, criterion
                 )
                 module.load_state_dict(backup)
+                ema_val = _ddp_mean(ema_val, use_ddp)
                 if ema_val < best_ema_loss:
                     best_ema_loss = ema_val
-                    torch.save(
-                        ema_state,
-                        os.path.join(
-                            config.output_dir, "best_ema_model.pt"
-                        ),
-                    )
+                    if is_main:
+                        torch.save(
+                            ema_state,
+                            os.path.join(
+                                config.output_dir, "best_ema_model.pt"
+                            ),
+                        )
                     saving_msg += " Saving EMA (val %.6f)" % ema_val
             history_val.append(
                 [
