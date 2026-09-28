@@ -132,8 +132,10 @@ def train_dgl(
                 print("Check", exp)
     print("config:", config.dict())
 
-    if not os.path.exists(config.output_dir):
-        os.makedirs(config.output_dir)
+    # exist_ok: under DDP every rank reaches this line at once and a plain
+    # exists-then-makedirs races (seven of eight ranks died with
+    # FileExistsError on an 8-node launch)
+    os.makedirs(config.output_dir, exist_ok=True)
     classification = False
     is_main = rank == 0
     tmp = config.dict()
