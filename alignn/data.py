@@ -189,8 +189,7 @@ def get_train_val_loaders(
         cmd = "rm -r " + train_sample + " " + val_sample + " " + test_sample
         print(cmd)
     # print ('output_dir data',output_dir)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)  # DDP ranks create it together
     if (
         os.path.exists(train_sample)
         and os.path.exists(val_sample)
