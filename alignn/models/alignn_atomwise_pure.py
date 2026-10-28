@@ -124,6 +124,12 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     # models; set explicitly to True/False to override.
     use_zbl: Optional[bool] = None
     zbl_cutoff: float = 0.9
+    # Learned per-element vector added to the atom embedding, indexed by
+    # atomic number. The CGCNN feature table gives identical vectors to
+    # Gd/Sm, Th/Np, La/Ce and Ho/Er, so without this the model cannot tell
+    # those elements apart. Zero-initialized: switching it on for a trained
+    # checkpoint (plus a zero weight) reproduces that checkpoint exactly.
+    element_embedding: bool = False
     # penalty_factor: float = 0.1
     # penalty_threshold: float = 1.0
     additional_output_features: int = 0
@@ -523,6 +529,10 @@ def _as_torchgraph(x):
 class ALIGNNAtomWisePure(nn.Module):
     """DGL-free ALIGNN atomwise."""
 
+    # compile-time constant for TorchScript, so models without the element
+    # embedding never reference the attribute they do not have
+    __constants__ = ["use_element_embedding"]
+
     def __init__(
         self,
         config: ALIGNNAtomWisePureConfig = ALIGNNAtomWisePureConfig(
@@ -538,6 +548,10 @@ class ALIGNNAtomWisePure(nn.Module):
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
         )
+        self.use_element_embedding: bool = bool(config.element_embedding)
+        if self.use_element_embedding:
+            self.element_embedding = nn.Embedding(120, config.hidden_features)
+            nn.init.zeros_(self.element_embedding.weight)
         self.edge_embedding = nn.Sequential(
             RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_input_features),
             MLPLayer(config.edge_input_features, config.embedding_features),
@@ -770,6 +784,10 @@ class ALIGNNAtomWisePure(nn.Module):
         # Embeddings. Apply the smooth cutoff exactly as forward(g) does, so
         # exported/TorchScript (LAMMPS/OpenMM) energies match the ASE path.
         x = self.atom_embedding(atom_features)
+        if self.use_element_embedding:
+            if atomic_numbers is None:
+                raise ValueError("element_embedding needs atomic_numbers")
+            x = x + self.element_embedding(atomic_numbers)
         if self.use_cutoff_function:
             c_off = cutoff_function_based_edges(
                 bondlength,
@@ -873,6 +891,8 @@ class ALIGNNAtomWisePure(nn.Module):
             z = None  # unused
 
         x = self.atom_embedding(g.ndata["atom_features"])
+        if self.use_element_embedding:
+            x = x + self.element_embedding(g.ndata["Z"])
 
         if self.config.use_cutoff_function:
             if self.config.multiply_cutoff:
