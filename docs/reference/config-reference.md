@@ -65,7 +65,7 @@ file is the authoritative list of what's available.
 | `learning_rate` | `1e-2` | Base LR. |
 | `weight_decay` | `0` | AdamW / SGD weight decay. |
 | `warmup_steps` | `2000` | OneCycle warmup steps (ignored if `scheduler="none"`). |
-| `criterion` | `"mse"` | Regression loss. `"l1"` is what the force-field examples use. `"zig"` / `"poisson"` are specialized. |
+| `criterion` | `"l1"` | Regression loss: `"l1"`, `"mse"` or `"wmse"` (intensity-weighted MSE). `"zig"` / `"poisson"` are accepted but have no loss in train.py and train with L1. Training used L1 regardless of this field until it began honoring it, so the default is `"l1"` to keep that behavior. |
 | `optimizer` | `"adamw"` | `"adamw"` or `"sgd"`. |
 | `scheduler` | `"onecycle"` | `"onecycle"` or `"none"`. |
 | `n_early_stopping` | `None` | Stop if val loss hasn't improved in this many epochs (~50 is common). |
