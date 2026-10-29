@@ -50,6 +50,56 @@ def _unwrap(net):
     return net.module if isinstance(net, DDP) else net
 
 
+def _ema_init(module):
+    """Clone a module's state dict as the initial EMA shadow state."""
+    return {
+        k: v.detach().clone() for k, v in module.state_dict().items()
+    }
+
+
+def _ema_update(ema_state, module, decay):
+    """Blend the module's current weights into the EMA shadow state.
+
+    Floating-point tensors are lerped with ``decay``; integer buffers
+    (e.g. counters) are copied through unchanged.
+    """
+    with torch.no_grad():
+        msd = module.state_dict()
+        for k, v in ema_state.items():
+            cur = msd[k].detach()
+            if v.dtype.is_floating_point:
+                v.mul_(decay).add_(cur, alpha=1.0 - decay)
+            else:
+                v.copy_(cur)
+
+
+def _graph_val_loss(module, val_loader, config, device, criterion):
+    """Graph-level validation loss under the module's current weights.
+
+    Used only for EMA checkpoint selection, so it evaluates the
+    graph-level head alone. For pure property models (all other loss
+    weights zero) this equals the full validation loss.
+    """
+    total = 0.0
+    with torch.no_grad():
+        for dats in val_loader:
+            if (config.compute_line_graph) > 0:
+                result = module(
+                    [
+                        dats[0].to(device),
+                        dats[1].to(device),
+                        dats[2].to(device),
+                    ]
+                )
+            else:
+                result = module([dats[0].to(device), dats[1].to(device)])
+            loss = config.model.graphwise_weight * criterion(
+                result["out"], dats[-1].to(device)
+            )
+            total += loss.item()
+    return total / max(1, len(val_loader))
+
+
 # torch.autograd.detect_anomaly()
 
 figlet_alignn = """
@@ -82,8 +132,10 @@ def train_dgl(
                 print("Check", exp)
     print("config:", config.dict())
 
-    if not os.path.exists(config.output_dir):
-        os.makedirs(config.output_dir)
+    # exist_ok: under DDP every rank reaches this line at once and a plain
+    # exists-then-makedirs races (seven of eight ranks died with
+    # FileExistsError on an 8-node launch)
+    os.makedirs(config.output_dir, exist_ok=True)
     classification = False
     is_main = rank == 0
     tmp = config.dict()
@@ -173,18 +225,25 @@ def train_dgl(
         "ealignn_atomwise": eALIGNNAtomWise,
         "alignn": ALIGNN,
     }
-    if config.random_seed is not None:
-        random.seed(config.random_seed)
-        torch.manual_seed(config.random_seed)
-        np.random.seed(config.random_seed)
-        torch.cuda.manual_seed_all(config.random_seed)
+    # torch_seed decouples training stochasticity (init, shuffling)
+    # from random_seed, which also fixes the train/val/test split.
+    # Seed replicas for ensembling vary torch_seed ONLY, so every
+    # replica sees the identical leaderboard split.
+    train_seed = config.random_seed
+    if getattr(config, "torch_seed", None) is not None:
+        train_seed = config.torch_seed
+    if train_seed is not None:
+        random.seed(train_seed)
+        torch.manual_seed(train_seed)
+        np.random.seed(train_seed)
+        torch.cuda.manual_seed_all(train_seed)
         try:
             import torch_xla.core.xla_model as xm
 
-            xm.set_rng_state(config.random_seed)
+            xm.set_rng_state(train_seed)
         except ImportError:
             pass
-        os.environ["PYTHONHASHSEED"] = str(config.random_seed)
+        os.environ["PYTHONHASHSEED"] = str(train_seed)
         if getattr(config, "deterministic", False):
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
@@ -265,7 +324,25 @@ def train_dgl(
 
     if "alignn_" in config.model.name:
         best_loss = np.inf
-        criterion = nn.L1Loss()
+        best_ema_loss = np.inf
+        ema_state = None
+        if getattr(config, "use_ema", False):
+            ema_state = _ema_init(_unwrap(net))
+
+        # Honor config.criterion (historically this was hardcoded to L1Loss
+        # regardless of the config value; every run before 2026-08-18 trained
+        # with L1). "wmse" is target-intensity-weighted MSE: bins carrying
+        # spectral weight are up-weighted to counter amplitude damping on
+        # sparse multi-output targets.
+        def _wmse(pred, target, _alpha=10.0):
+            w = 1.0 + _alpha * target.detach().abs()
+            return (w * (pred - target) ** 2).mean()
+
+        criterion = {
+            "l1": nn.L1Loss(),
+            "mse": nn.MSELoss(),
+            "wmse": _wmse,
+        }.get(config.criterion, nn.L1Loss())
         if classification:
             criterion = nn.NLLLoss()
         # NOTE: optimizer / scheduler intentionally NOT recreated here.
@@ -291,6 +368,15 @@ def train_dgl(
                         best_loss,
                     )
         for e in range(start_epoch, config.epochs):
+            # A DistributedSampler shuffles from a seed derived from the epoch
+            # number, so without this every epoch replays the same order and
+            # each rank sees the same slice all run long.
+            for _loader in (train_loader, val_loader):
+                _set_epoch = getattr(
+                    getattr(_loader, "sampler", None), "set_epoch", None
+                )
+                if _set_epoch is not None:
+                    _set_epoch(e)
             train_init_time = time.time()
             running_loss = 0
             running_loss1 = 0
@@ -417,6 +503,10 @@ def train_dgl(
                 loss = loss1 + loss2 + loss3 + loss4 + loss5
                 loss.backward()
                 optimizer.step()
+                if ema_state is not None:
+                    _ema_update(
+                        ema_state, _unwrap(net), config.ema_decay
+                    )
                 # Step OneCycleLR per batch (its design assumption); other
                 # schedulers are stepped once per epoch below.
                 if _step_scheduler_per_batch:
@@ -469,6 +559,10 @@ def train_dgl(
             for dats, jid in zip(val_loader, val_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
+                # release the previous batch's autograd graph before the
+                # forward pass: with no backward() here, result/loss keep
+                # the create_graph force graph alive, doubling peak memory
+                result = loss = loss1 = loss2 = loss3 = loss4 = loss5 = None
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
                     result = net(
@@ -601,7 +695,10 @@ def train_dgl(
                         "epoch": e + 1,
                         "optimizer": optimizer.state_dict(),
                         "scheduler": scheduler.state_dict(),
-                        "best_loss": best_loss,
+                        # this epoch's val loss is compared with
+                        # best_loss only below, so count it here too or a
+                        # resumed run restores a best one epoch stale
+                        "best_loss": min(best_loss, val_loss),
                     },
                     os.path.join(config.output_dir, "current_state.pt"),
                 )
@@ -628,6 +725,32 @@ def train_dgl(
                         data=val_result,
                     )
                 best_model = net
+            if ema_state is not None:
+                # Every rank evaluates its own val shard and the losses are
+                # averaged, as for val_loss above: rank 0 alone would score
+                # the EMA weights on 1/N of the val set and then compare
+                # that with the full-set best_loss in eval_best_checkpoint.
+                module = _unwrap(net)
+                backup = {
+                    k: v.detach().clone()
+                    for k, v in module.state_dict().items()
+                }
+                module.load_state_dict(ema_state)
+                ema_val = _graph_val_loss(
+                    module, val_loader, config, device, criterion
+                )
+                module.load_state_dict(backup)
+                ema_val = _ddp_mean(ema_val, use_ddp)
+                if ema_val < best_ema_loss:
+                    best_ema_loss = ema_val
+                    if is_main:
+                        torch.save(
+                            ema_state,
+                            os.path.join(
+                                config.output_dir, "best_ema_model.pt"
+                            ),
+                        )
+                    saving_msg += " Saving EMA (val %.6f)" % ema_val
             history_val.append(
                 [
                     val_loss,
@@ -670,12 +793,39 @@ def train_dgl(
             # module, not the DDP wrapper: a DDP forward performs collectives
             # (buffer broadcast) that the other ranks never reach here, which
             # deadlocks rank 0 until the NCCL watchdog times out.
+            if getattr(config, "eval_best_checkpoint", False):
+                # Evaluate the best-validation weights rather than the
+                # last epoch's. best_model = net below is an alias, so
+                # loading here also covers the prediction-writing blocks.
+                cand_path = os.path.join(
+                    config.output_dir, "best_model.pt"
+                )
+                cand_loss = best_loss
+                ema_path = os.path.join(
+                    config.output_dir, "best_ema_model.pt"
+                )
+                if os.path.exists(ema_path) and best_ema_loss < cand_loss:
+                    cand_path, cand_loss = ema_path, best_ema_loss
+                if os.path.exists(cand_path):
+                    _unwrap(net).load_state_dict(
+                        torch.load(cand_path, map_location=device)
+                    )
+                    print(
+                        "Loaded",
+                        os.path.basename(cand_path),
+                        "for final evaluation",
+                        "(val loss %.6f)" % cand_loss,
+                    )
             eval_net = _unwrap(net)
             test_loss = 0
             test_result = []
             for dats, jid in zip(test_loader, test_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
+                # release the previous batch's autograd graph before the
+                # forward pass: with no backward() here, result/loss keep
+                # the create_graph force graph alive, doubling peak memory
+                result = loss = loss1 = loss2 = loss3 = loss4 = loss5 = None
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
                     result = eval_net(
@@ -817,7 +967,9 @@ def train_dgl(
                     out_data = best_model(
                         [g.to(device), lg.to(device), lat.to(device)]
                     )["out"]
-                    out_data = out_data.detach().cpu().numpy().tolist()
+                    out_data = (
+                        out_data.detach().cpu().numpy().flatten().tolist()
+                    )
                     if config.standard_scalar_and_pca:
                         sc = pk.load(open("sc.pkl", "rb"))
                         out_data = list(

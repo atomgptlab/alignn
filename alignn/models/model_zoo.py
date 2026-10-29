@@ -123,6 +123,46 @@ class ModelZoo(nn.Module):
         return zoo
 
     @classmethod
+    def from_model_dirs(
+        cls,
+        model_dirs: Dict[str, str],
+        map_location: str = "cpu",
+    ) -> "LazyModelZoo":
+        """Build a lazy zoo from directories of config.json + best_model.pt.
+
+        This is the layout produced by
+        ``alignn.ff.ff.get_figshare_model_ff`` and by training runs, so
+        figshare-downloaded property models plug in directly:
+
+            zoo = ModelZoo.from_model_dirs(
+                {"formation_energy_peratom": get_figshare_model_ff(
+                    model_name="formation_energy_peratom")}
+            )
+        """
+        try:  # pydantic v2 / v1
+            fields = set(ALIGNNAtomWisePureConfig.model_fields)
+        except AttributeError:
+            fields = set(ALIGNNAtomWisePureConfig.__fields__)
+        zoo = LazyModelZoo(map_location=map_location)
+        for name, model_dir in model_dirs.items():
+            model_dir = Path(model_dir)
+            with open(model_dir / "config.json") as f:
+                cfg_dict = json.load(f)
+            mcfg = dict(cfg_dict.get("model", cfg_dict))
+            is_efs = bool(mcfg.get("calculate_gradient")) and bool(
+                mcfg.get("gradwise_weight", 0)
+            )
+            mcfg = {k: v for k, v in mcfg.items() if k in fields}
+            mcfg["name"] = "alignn_atomwise_pure"
+            zoo.add_lazy(
+                name=name,
+                checkpoint=str(model_dir / "best_model.pt"),
+                config=ALIGNNAtomWisePureConfig(**mcfg),
+                is_efs=is_efs,
+            )
+        return zoo
+
+    @classmethod
     def from_alignn_checkpoints(
         cls,
         ckpts: Dict[str, str],
@@ -201,11 +241,18 @@ class LazyModelZoo(ModelZoo):
         entry = self._lazy[name]
         model = ALIGNNAtomWisePure(entry["config"])
         state = torch.load(
-            entry["checkpoint"], map_location=self._map_location
+            entry["checkpoint"],
+            map_location=self._map_location,
+            weights_only=False,
         )
         if isinstance(state, dict) and "model" in state:
             state = state["model"]
-        model.load_state_dict(state)
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        if missing or unexpected:
+            print(
+                f"[model_zoo:{name}] load_state_dict: "
+                f"missing={len(missing)} unexpected={len(unexpected)}"
+            )
         model.eval()
         self._models[name] = model
         return model

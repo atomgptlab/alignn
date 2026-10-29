@@ -124,6 +124,12 @@ class ALIGNNAtomWisePureConfig(BaseSettings):
     # models; set explicitly to True/False to override.
     use_zbl: Optional[bool] = None
     zbl_cutoff: float = 0.9
+    # Learned per-element vector added to the atom embedding, indexed by
+    # atomic number. The CGCNN feature table gives identical vectors to
+    # Gd/Sm, Th/Np, La/Ce and Ho/Er, so without this the model cannot tell
+    # those elements apart. Zero-initialized: switching it on for a trained
+    # checkpoint (plus a zero weight) reproduces that checkpoint exactly.
+    element_embedding: bool = False
     # penalty_factor: float = 0.1
     # penalty_threshold: float = 1.0
     additional_output_features: int = 0
@@ -463,15 +469,16 @@ def cutoff_function_based_edges(
     return torch.where(r <= inner_cutoff, envelope, torch.zeros_like(r))
 
 
-def zbl_edge_energy(
+def zbl_edge_energies(
     z_i: torch.Tensor, z_j: torch.Tensor, r: torch.Tensor, r_cut: float
 ) -> torch.Tensor:
-    """ZBL screened-Coulomb repulsion summed over edges within ``r_cut``.
+    """Per-edge ZBL screened-Coulomb repulsion within ``r_cut``.
 
     ``z_i``, ``z_j`` are per-edge atomic numbers (float); ``r`` per-edge bond
-    lengths. Returns a scalar energy (0.5 accounts for the two directed edges
-    per pair). Differentiable through ``r`` -> positions, so autograd yields
-    the ZBL forces. Smooth DimeNet(p=4) envelope switches it off at ``r_cut``.
+    lengths. Returns one energy per directed edge (0.5 accounts for the two
+    directed edges per pair), so a batched caller can sum each graph's own
+    edges. Differentiable through ``r`` -> positions, so autograd yields the
+    ZBL forces. Smooth DimeNet(p=4) envelope switches it off at ``r_cut``.
     """
     a = 0.46850 / (torch.pow(z_i, 0.23) + torch.pow(z_j, 0.23))
     x = r / a
@@ -491,7 +498,14 @@ def zbl_edge_energy(
         - (p * (p + 1.0) / 2.0) * torch.pow(t, p + 2.0)
     )
     mask = (r < r_cut).to(e_pair.dtype)
-    return 0.5 * (e_pair * env * mask).sum()
+    return 0.5 * e_pair * env * mask
+
+
+def zbl_edge_energy(
+    z_i: torch.Tensor, z_j: torch.Tensor, r: torch.Tensor, r_cut: float
+) -> torch.Tensor:
+    """ZBL repulsion summed over all edges (one graph): a scalar energy."""
+    return zbl_edge_energies(z_i, z_j, r, r_cut).sum()
 
 
 def _bond_cosines(r_ij: torch.Tensor, r_jk: torch.Tensor) -> torch.Tensor:
@@ -515,6 +529,10 @@ def _as_torchgraph(x):
 class ALIGNNAtomWisePure(nn.Module):
     """DGL-free ALIGNN atomwise."""
 
+    # compile-time constant for TorchScript, so models without the element
+    # embedding never reference the attribute they do not have
+    __constants__ = ["use_element_embedding"]
+
     def __init__(
         self,
         config: ALIGNNAtomWisePureConfig = ALIGNNAtomWisePureConfig(
@@ -530,6 +548,10 @@ class ALIGNNAtomWisePure(nn.Module):
         self.atom_embedding = MLPLayer(
             config.atom_input_features, config.hidden_features
         )
+        self.use_element_embedding: bool = bool(config.element_embedding)
+        if self.use_element_embedding:
+            self.element_embedding = nn.Embedding(120, config.hidden_features)
+            nn.init.zeros_(self.element_embedding.weight)
         self.edge_embedding = nn.Sequential(
             RBFExpansion(vmin=0, vmax=8.0, bins=config.edge_input_features),
             MLPLayer(config.edge_input_features, config.embedding_features),
@@ -762,6 +784,10 @@ class ALIGNNAtomWisePure(nn.Module):
         # Embeddings. Apply the smooth cutoff exactly as forward(g) does, so
         # exported/TorchScript (LAMMPS/OpenMM) energies match the ASE path.
         x = self.atom_embedding(atom_features)
+        if self.use_element_embedding:
+            if atomic_numbers is None:
+                raise ValueError("element_embedding needs atomic_numbers")
+            x = x + self.element_embedding(atomic_numbers)
         if self.use_cutoff_function:
             c_off = cutoff_function_based_edges(
                 bondlength,
@@ -865,6 +891,8 @@ class ALIGNNAtomWisePure(nn.Module):
             z = None  # unused
 
         x = self.atom_embedding(g.ndata["atom_features"])
+        if self.use_element_embedding:
+            x = x + self.element_embedding(g.ndata["Z"])
 
         if self.config.use_cutoff_function:
             if self.config.multiply_cutoff:
@@ -912,7 +940,14 @@ class ALIGNNAtomWisePure(nn.Module):
                 * (self.config.penalty_threshold - bondlength),
                 torch.zeros_like(bondlength),
             )
-            en_out = en_out + penalties.sum()
+            # Sum each graph's own short-bond penalty into its own energy.
+            # Adding penalties.sum() (the whole batch's penalty) to every
+            # graph made the penalty forces scale with the batch size, so a
+            # model trained at batch 16 behaved differently at batch 1.
+            pen = scatter_sum(penalties, g.edge_batch_id, g.batch_size)
+            if en_out.dim() > 1:
+                pen = pen.unsqueeze(-1)
+            en_out = en_out + pen
 
         # ZBL only applies to energy/force (force-field) models; the guard on
         # calculate_gradient keeps it a no-op for property / multi-output /
@@ -923,16 +958,29 @@ class ALIGNNAtomWisePure(nn.Module):
             and ("Z" in g.ndata)
         ):
             zz = g.ndata["Z"].to(bondlength.dtype)
-            e_zbl = zbl_edge_energy(
-                zz.index_select(0, g.src),
-                zz.index_select(0, g.dst),
-                bondlength,
-                self.zbl_cutoff,
+            # Sum each graph's own short-range edges into its own energy.
+            # A single batch-wide sum added to every graph made ZBL forces
+            # scale with the batch size (x16 in training, x1 for one
+            # structure) and leaked other structures' ZBL energy into each
+            # structure's predicted energy.
+            e_zbl = scatter_sum(
+                zbl_edge_energies(
+                    zz.index_select(0, g.src),
+                    zz.index_select(0, g.dst),
+                    bondlength,
+                    self.zbl_cutoff,
+                ),
+                g.edge_batch_id,
+                g.batch_size,
             )
+            e_zbl_atom = e_zbl / natoms.to(e_zbl.dtype)
+            if en_out.dim() > 1:
+                e_zbl = e_zbl.unsqueeze(-1)
+                e_zbl_atom = e_zbl_atom.unsqueeze(-1)
             en_out = en_out + e_zbl  # total energy -> forces via autograd
             # ``out`` is the per-atom energy the FF calculator scales by
             # num_atoms; fold ZBL in so the returned energy matches.
-            out = out + e_zbl / float(g.num_nodes)
+            out = out + e_zbl_atom
 
         atomwise_pred = torch.empty(1, device=r.device)
         if (

@@ -424,6 +424,12 @@ def train_for_folder(
         prepare_batch,
     ) = get_train_val_loaders(
         dataset_array=dataset,
+        # Without these the loader builder keeps its world_size=0 default, no
+        # DistributedSampler is created, and every rank iterates the WHOLE
+        # training set: N GPUs then cost N times the work for one epoch's
+        # progress instead of splitting it.
+        rank=rank,
+        world_size=world_size,
         target="target",
         target_atomwise=target_atomwise,
         target_grad=target_grad,
@@ -462,7 +468,14 @@ def train_for_folder(
         read_existing=config.read_existing,
         dtype=config.dtype,
     )
-    # print("dataset", dataset[0])
+    # The loaders now read from the LMDB caches, so the parsed dataset
+    # list is dead weight. data.py frees its own references, but this
+    # one keeps every structure dict alive for the whole training run
+    # (tens of GB for million-entry force-field datasets).
+    dataset = None
+    import gc
+
+    gc.collect()
     t1 = time.time()
     # world_size = torch.cuda.device_count()
     print("rank", rank)
