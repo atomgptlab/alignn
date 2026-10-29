@@ -54,7 +54,8 @@ setuptools.setup(
         "alignn.ff": [
             "all_models_alignn.json",
             "all_models_alignn_atomwise.json",
-        ]
+        ],
+        "alignn.scripts": ["alignn_db_manifest.json"],
     },
     classifiers=[
         "Programming Language :: Python :: 3",

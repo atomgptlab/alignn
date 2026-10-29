@@ -132,8 +132,10 @@ def train_dgl(
                 print("Check", exp)
     print("config:", config.dict())
 
-    if not os.path.exists(config.output_dir):
-        os.makedirs(config.output_dir)
+    # exist_ok: under DDP every rank reaches this line at once and a plain
+    # exists-then-makedirs races (seven of eight ranks died with
+    # FileExistsError on an 8-node launch)
+    os.makedirs(config.output_dir, exist_ok=True)
     classification = False
     is_main = rank == 0
     tmp = config.dict()
@@ -366,6 +368,15 @@ def train_dgl(
                         best_loss,
                     )
         for e in range(start_epoch, config.epochs):
+            # A DistributedSampler shuffles from a seed derived from the epoch
+            # number, so without this every epoch replays the same order and
+            # each rank sees the same slice all run long.
+            for _loader in (train_loader, val_loader):
+                _set_epoch = getattr(
+                    getattr(_loader, "sampler", None), "set_epoch", None
+                )
+                if _set_epoch is not None:
+                    _set_epoch(e)
             train_init_time = time.time()
             running_loss = 0
             running_loss1 = 0
@@ -548,6 +559,10 @@ def train_dgl(
             for dats, jid in zip(val_loader, val_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
+                # release the previous batch's autograd graph before the
+                # forward pass: with no backward() here, result/loss keep
+                # the create_graph force graph alive, doubling peak memory
+                result = loss = loss1 = loss2 = loss3 = loss4 = loss5 = None
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
                     result = net(
@@ -680,7 +695,10 @@ def train_dgl(
                         "epoch": e + 1,
                         "optimizer": optimizer.state_dict(),
                         "scheduler": scheduler.state_dict(),
-                        "best_loss": best_loss,
+                        # this epoch's val loss is compared with
+                        # best_loss only below, so count it here too or a
+                        # resumed run restores a best one epoch stale
+                        "best_loss": min(best_loss, val_loss),
                     },
                     os.path.join(config.output_dir, "current_state.pt"),
                 )
@@ -707,7 +725,11 @@ def train_dgl(
                         data=val_result,
                     )
                 best_model = net
-            if ema_state is not None and is_main:
+            if ema_state is not None:
+                # Every rank evaluates its own val shard and the losses are
+                # averaged, as for val_loss above: rank 0 alone would score
+                # the EMA weights on 1/N of the val set and then compare
+                # that with the full-set best_loss in eval_best_checkpoint.
                 module = _unwrap(net)
                 backup = {
                     k: v.detach().clone()
@@ -718,14 +740,16 @@ def train_dgl(
                     module, val_loader, config, device, criterion
                 )
                 module.load_state_dict(backup)
+                ema_val = _ddp_mean(ema_val, use_ddp)
                 if ema_val < best_ema_loss:
                     best_ema_loss = ema_val
-                    torch.save(
-                        ema_state,
-                        os.path.join(
-                            config.output_dir, "best_ema_model.pt"
-                        ),
-                    )
+                    if is_main:
+                        torch.save(
+                            ema_state,
+                            os.path.join(
+                                config.output_dir, "best_ema_model.pt"
+                            ),
+                        )
                     saving_msg += " Saving EMA (val %.6f)" % ema_val
             history_val.append(
                 [
@@ -798,6 +822,10 @@ def train_dgl(
             for dats, jid in zip(test_loader, test_loader.dataset.ids):
                 info = {}
                 info["id"] = jid
+                # release the previous batch's autograd graph before the
+                # forward pass: with no backward() here, result/loss keep
+                # the create_graph force graph alive, doubling peak memory
+                result = loss = loss1 = loss2 = loss3 = loss4 = loss5 = None
                 optimizer.zero_grad()
                 if (config.compute_line_graph) > 0:
                     result = eval_net(
