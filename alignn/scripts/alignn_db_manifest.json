@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Model manifest for alignn/screen.py (ALIGNN DB over Alexandria).",
+    "Each property resolves to a model directory holding config.json +",
+    "best_model.pt. 'figshare': key in alignn/ff/all_models_alignn_atomwise",
+    ".json (downloaded on first use); 'dir': local path to a training run",
+    "(takes precedence). Entries with both null are skipped with a warning",
+    "- fill 'dir' with the ALIGNN 2.0 run directories once training",
+    "finishes."
+  ],
+  "properties": {
+    "formation_energy_peratom": {"figshare": "formation_energy_peratom", "dir": null},
+    "optb88vdw_total_energy": {"figshare": null, "dir": null},
+    "optb88vdw_bandgap": {"figshare": "optb88vdw_bandgap", "dir": null},
+    "mbj_bandgap": {"figshare": "mbj_bandgap", "dir": null},
+    "ehull": {"figshare": "ehull", "dir": null},
+    "bulk_modulus_kv": {"figshare": "bulk_modulus_kv", "dir": null},
+    "shear_modulus_gv": {"figshare": "shear_modulus_gv", "dir": null},
+    "magmom_oszicar": {"figshare": "magmom_oszicar", "dir": null},
+    "slme": {"figshare": "slme", "dir": null},
+    "spillage": {"figshare": "spillage", "dir": null},
+    "kpoint_length_unit": {"figshare": null, "dir": null},
+    "encut": {"figshare": null, "dir": null},
+    "epsx": {"figshare": "epsx", "dir": null},
+    "epsy": {"figshare": null, "dir": null},
+    "epsz": {"figshare": null, "dir": null},
+    "mepsx": {"figshare": "mepsx", "dir": null},
+    "mepsy": {"figshare": null, "dir": null},
+    "mepsz": {"figshare": null, "dir": null},
+    "dfpt_piezo_max_dij": {"figshare": "dfpt_piezo_max_dij", "dir": null},
+    "dfpt_piezo_max_dielectric": {"figshare": "dfpt_piezo_max_dielectric", "dir": null},
+    "exfoliation_energy": {"figshare": "exfoliation_energy", "dir": null},
+    "max_efg": {"figshare": "max_efg", "dir": null},
+    "avg_elec_mass": {"figshare": "avg_elec_mass", "dir": null},
+    "avg_hole_mass": {"figshare": "avg_hole_mass", "dir": null},
+    "n-Seebeck": {"figshare": "n-Seebeck", "dir": null},
+    "n-powerfact": {"figshare": "n-powerfact", "dir": null},
+    "ph_heat_capacity": {"figshare": null, "dir": null},
+    "Tc_supercon": {"figshare": "Tc_supercon", "dir": null}
+  }
+}
