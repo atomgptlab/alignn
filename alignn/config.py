@@ -208,7 +208,10 @@ class TrainingConfig(BaseSettings):
     learning_rate: float = 1e-2
     filename: str = "sample"
     warmup_steps: int = 2000
-    criterion: Literal["mse", "l1", "poisson", "zig", "wmse"] = "mse"
+    # Loss function. Training ignored this field and always used L1 until
+    # train.py began honoring it, so the default is l1: configs that leave
+    # it unset keep training exactly as before.
+    criterion: Literal["mse", "l1", "poisson", "zig", "wmse"] = "l1"
     optimizer: Literal["adamw", "sgd"] = "adamw"
     scheduler: Literal["onecycle", "none"] = "onecycle"
     pin_memory: bool = False
