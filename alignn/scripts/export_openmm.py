@@ -15,7 +15,7 @@ This wrapper bridges the unit/interface gap:
 
 Usage
 -----
-    # bundled default ALIGNN-FF (matpes_r2scan), atoms taken from a POSCAR
+    # bundled default ALIGNN-FF (alignn_ff_mptrj), atoms taken from a POSCAR
     python alignn/scripts/export_openmm.py \
         --structure POSCAR --output alignn_openmm.pt
     # then in OpenMM:

@@ -1379,11 +1379,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.218,
-        "figshare_article_id": 33148208,
+        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840662",
         # "url": "https://ndownloader.figshare.com/files/67217507",
-        "description": "ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet). PBE energy scale.",
+        "description": "ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale.",
     },
     "matpes_r2scan_ff": {
         "category": "forcefield",
@@ -1392,23 +1392,23 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.0487,
-        "figshare_article_id": 33190782,
+        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840338",
         # "url": "https://ndownloader.figshare.com/files/67360764",
-        "description": "DEFAULT ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
+        "description": "ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
     },
-    "matpes_omat24_1m_ff": {
+    "omat24_1m_ff": {
         "category": "forcefield",
         "graph": "radius",
         "cutoff": 5.0,
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.0487,
-        "figshare_article_id": 33190782,
+        "test_mae": None,
+        "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840344",
-        "description": "DEFAULT ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
+        "description": "ALIGNN-FF with per-element embedding trained on OMat24 (1M subset).",
     },
     "mlearn_si": {
         "category": "forcefield",
@@ -1429,11 +1429,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.0707,
-        "figshare_article_id": 33134969,
+        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840341",
         # "url": "https://ndownloader.figshare.com/files/67163333",
-        "description": "Universal force field trained on MPtrj (~1.5M configs, ep46).",
+        "description": "DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs).",
     },
     "charge_atomwise": {
         "category": "atomwise",
@@ -1604,6 +1604,7 @@ def get_alignn2_model(name, download=True, cache_dir=None):
                 f["name"]: f["download_url"] for f in r.json().get("files", [])
             }
             url = files.get(meta.get("zip")) or next(iter(files.values()))
+        print("Obtaining model", name, "from", url)
         r = requests.get(url, stream=True)
         r.raise_for_status()
         zp = os.path.join(dest, "_model.zip")

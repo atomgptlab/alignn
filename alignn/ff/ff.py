@@ -100,6 +100,7 @@ def get_figshare_model_ff(
     print("dir_path", dir_path)
     best_path = os.path.join(dir_path, filename)
     if not os.path.exists(best_path):
+        print("Obtaining model", model_name, "from", url)
         response = requests.get(url, stream=True)
         total_size_in_bytes = int(response.headers.get("content-length", 0))
         block_size = 1024  # 1 Kibibyte
@@ -161,6 +162,7 @@ def get_figshare_model_prop(
     print("dir_path", dir_path)
     best_path = os.path.join(dir_path, filename)
     if not os.path.exists(best_path):
+        print("Obtaining model", model_name, "from", url)
         response = requests.get(url, stream=True)
         total_size_in_bytes = int(response.headers.get("content-length", 0))
         block_size = 1024  # 1 Kibibyte
@@ -207,8 +209,9 @@ def get_figshare_model_prop(
 
 
 def default_path():
-    """Get default model path (ALIGNN 2.0 matpes_r2scan, 2/2/128 smooth)."""
-    dpath = get_figshare_model_ff(model_name="matpes_r2scan")
+    """Get default model path (ALIGNN-FF MPtrj, per-element embedding)."""
+    dpath = get_figshare_model_ff(model_name="alignn_ff_mptrj")
+    # dpath = get_figshare_model_ff(model_name="matpes_r2scan")  # previous default
     # dpath = get_figshare_model_ff(model_name="matpes_pbe")  # previous default
     # dpath = get_figshare_model_ff(model_name="mps")  # previous default
     # dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")
