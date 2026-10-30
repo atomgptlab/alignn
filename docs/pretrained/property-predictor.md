@@ -42,7 +42,7 @@ A non-exhaustive list — names match the `--model_name` flag:
 | hMOF CO₂ adsorption | `hmof_co2_absp_alignn` |
 
 See
-[`all_models_alignn.json`](https://github.com/atomgptlab/alignn/blob/main/alignn/ff/all_models_alignn.json)
+[`alignn_property.yml`](https://github.com/atomgptlab/alignn/blob/main/alignn/registry/alignn_property.yml)
 for the full machine-readable list.
 
 ## File formats
@@ -78,8 +78,8 @@ print(calc.predictions())
 ```
 
 The pure-PyTorch ALIGNN 2.0 models are pulled from
-[`pretrained2.py`](https://github.com/atomgptlab/alignn/blob/develop/alignn/pretrained2.py)
-(`list_alignn2_models()` shows the full registry). Set `energy=True` to also get
+[`alignn_property.yml`](https://github.com/atomgptlab/alignn/blob/develop/alignn/registry/alignn_property.yml)
+through `alignn.pretrained` (`list_alignn2_models()` shows the full registry). Set `energy=True` to also get
 force-field energy/forces/stress from the same calculator.
 
 ## See also

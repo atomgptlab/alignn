@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2026.10.11",
+    version="2026.10.15",
     author="Kamal Choudhary",
     author_email="drkamal@jhu.edu",
     description="alignn",
@@ -38,6 +38,7 @@ setuptools.setup(
         "pyparsing>=2.2.1",
         "ase",
         "lmdb",
+        "pyyaml",
     ],
     scripts=[
         "alignn/pretrained.py",
@@ -51,10 +52,7 @@ setuptools.setup(
     url="https://github.com/atomgptlab/alignn",
     packages=setuptools.find_packages(),
     package_data={
-        "alignn.ff": [
-            "all_models_alignn.json",
-            "all_models_alignn_atomwise.json",
-        ],
+        "alignn.registry": ["*.yml"],
         "alignn.scripts": ["alignn_db_manifest.json"],
     },
     classifiers=[

@@ -35,12 +35,13 @@ this page is a map, not an API reference.
 |---|---|
 | `alignn.ff.ff` | `AlignnAtomwiseCalculator`, `default_path`, training utils |
 | `alignn.ff.calculators` | ASE calculator implementations |
-| `alignn.ff.all_models_alignn.json` | Registry of property-predictor checkpoints |
-| `alignn.ff.all_models_alignn_atomwise.json` | Registry of ALIGNN-FF checkpoints |
+| `alignn/registry/alignn_property.yml` | Registry of property-predictor checkpoints |
+| `alignn/registry/alignn_ff.yml` | Registry of ALIGNN-FF checkpoints |
+| `alignn/registry/alignn_inverse.yml` | Registry of generative inverse-design checkpoints |
 
-Bundled pretrained checkpoints live in sub-directories of `alignn/ff/`, e.g.
-`v10.30.2024_dft_3d_307k/`, `v12.2.2024_dft_3d_307k/`,
-`v2024.12.12_dft_3d_multi_prop/`, `alignnff_wt01/`.
+Pretrained checkpoints are not bundled: they are downloaded by name on first
+use and cached in `~/.cache/atomgptlab/` (or `~/.alignn2_models/` for
+`alignn.pretrained`).
 
 ## Examples & scripts
 

@@ -69,11 +69,15 @@ plt.ylabel("Total energy (eV)")
 
 ## Choosing a model
 
-`default_path()` returns the currently recommended checkpoint. To pin a specific one,
-pass the path directly:
+`default_path()` returns the currently recommended checkpoint
+(`alignn_ff_mptrj`). To pin a specific one, load it by name or pass a local path:
 
 ```python
-calc = AlignnAtomwiseCalculator(path="alignn/ff/v12.2.2024_dft_3d_307k")
+from alignn.ff.ff import get_figshare_model_ff
+
+calc = AlignnAtomwiseCalculator(
+    path=get_figshare_model_ff(model_name="alignn_ff_matpes_pbe")
+)
 ```
 
 See the [pretrained ALIGNN-FF page](../pretrained/alignn-ff.md) for available

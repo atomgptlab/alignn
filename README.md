@@ -235,6 +235,8 @@ See [docs/pretrained/](docs/pretrained/):
 - [Property predictor](docs/pretrained/property-predictor.md)
 - [ALIGNN-FF](docs/pretrained/alignn-ff.md)
 
+Model names and download links are in [`alignn/registry/`](alignn/registry).
+
 <a name="webapp"></a>
 ## Web-apps
 
@@ -293,12 +295,21 @@ calc = AlignnAtomwiseCalculator(path=model_dir)
 The unified calculator takes the name directly:
 `AlignnUnifiedConfig(ff_model="alignn_ff_matpes_pbe")`.
 
+The older names `matpes_pbe` and `matpes_r2scan` (and `matpes_pbe_ff`,
+`matpes_r2scan_ff`, `mptrj_ff` in `alignn.pretrained`) also load these models.
+The previous models are still available as `matpes_pbe_old`,
+`matpes_r2scan_old`, `matpes_pbe_ff_old`, `matpes_r2scan_ff_old` and
+`mptrj_ff_old`.
+
 Models download once and are cached by name in `~/.cache/atomgptlab/alignn_ff`
-(set `ATOMGPTLAB_CACHE` to move it). Since 2026.10.11 the older names
-`matpes_pbe` and `matpes_r2scan` also point to these models. If you loaded them
-before that, delete their cache folders to get the new versions. The same
-applies to `matpes_pbe_ff`, `matpes_r2scan_ff` and `mptrj_ff` in
-`alignn.pretrained`, which are cached in `~/.alignn2_models`.
+(set `ATOMGPTLAB_CACHE` to move it). From 2026.10.15, caches written by older
+versions are removed automatically, with a warning, on the first model download,
+so renamed models are fetched again.
+
+All pretrained models are listed in YAML files under
+[`alignn/registry/`](alignn/registry): `alignn_ff.yml` (force fields),
+`alignn_property.yml` (property predictors) and `alignn_inverse.yml`
+(generative inverse design).
 
 <a name="inverse"></a>
 ## Inverse design — generate structures

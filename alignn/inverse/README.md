@@ -119,8 +119,9 @@ print(result.atoms)         # jarvis Atoms, ready for anything else in ALIGNN
 print(result.to_poscar())
 ```
 
-Released models are listed in the ALIGNN 2.0 registry and downloaded on first
-use. With no argument you get `DEFAULT_MODEL` (`csp_supercon_alex`, trained on
+Released models are listed in
+[`alignn/registry/alignn_inverse.yml`](../registry/alignn_inverse.yml) and
+downloaded on first use. With no argument you get `DEFAULT_MODEL` (`csp_supercon_alex`, trained on
 the larger of the two superconductor benchmarks); pass `model="name"` to pick
 another or `checkpoint=` for a local file.
 
