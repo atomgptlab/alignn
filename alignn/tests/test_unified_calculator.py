@@ -1,6 +1,6 @@
 """Tests for the unified ALIGNN calculator (FF + pure-torch property predictors).
 
-Covers the force field (energy/forces/stress via matpes_r2scan default), a scalar
+Covers the force field (energy/forces/stress via alignn_ff_mptrj default), a scalar
 property (formation_energy_peratom), a spectrum (edos, D=300), a tensor
 (elastic_tensor, D=36), the radius/knn graph switch, and config validation.
 Models are downloaded+cached on first use (like the other pretrained tests).
@@ -62,11 +62,11 @@ def test_unified_ff_scalar_spectrum_tensor():
 
 
 def test_unified_ff_only_default_model():
-    """FF-only path uses the pure-torch matpes_r2scan default (no dgl)."""
+    """FF-only path uses the pure-torch alignn_ff_mptrj default (no dgl)."""
     cfg = (
         AlignnUnifiedConfig()
     )  # defaults: energy/forces/stress, no properties
-    assert cfg.ff_model == "matpes_r2scan"
+    assert cfg.ff_model == "alignn_ff_mptrj"
     calc = AlignnUnifiedCalculator(cfg)
     si = bulk("Si", "diamond", a=5.43)
     si.calc = calc

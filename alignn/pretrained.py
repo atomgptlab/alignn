@@ -1379,10 +1379,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.218,
-        "figshare_article_id": 33148208,
-        "url": "https://ndownloader.figshare.com/files/67217507",
-        "description": "ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet). PBE energy scale.",
+        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "figshare_article_id": 34846446,
+        "url": "https://ndownloader.figshare.com/files/70840662",
+        # "url": "https://ndownloader.figshare.com/files/67217507",
+        "description": "ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale.",
     },
     "matpes_r2scan_ff": {
         "category": "forcefield",
@@ -1391,10 +1392,23 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.0487,
-        "figshare_article_id": 33190782,
-        "url": "https://ndownloader.figshare.com/files/67360764",
-        "description": "DEFAULT ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
+        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "figshare_article_id": 34846446,
+        "url": "https://ndownloader.figshare.com/files/70840338",
+        # "url": "https://ndownloader.figshare.com/files/67360764",
+        "description": "ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
+    },
+    "omat24_1m_ff": {
+        "category": "forcefield",
+        "graph": "radius",
+        "cutoff": 5.0,
+        "output_features": 1,
+        "target": "energy_per_atom",
+        "unit": "eV/atom",
+        "test_mae": None,
+        "figshare_article_id": 34846446,
+        "url": "https://ndownloader.figshare.com/files/70840344",
+        "description": "ALIGNN-FF with per-element embedding trained on OMat24 (1M subset).",
     },
     "mlearn_si": {
         "category": "forcefield",
@@ -1415,10 +1429,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": 0.0707,
-        "figshare_article_id": 33134969,
-        "url": "https://ndownloader.figshare.com/files/67163333",
-        "description": "Universal force field trained on MPtrj (~1.5M configs, ep46).",
+        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "figshare_article_id": 34846446,
+        "url": "https://ndownloader.figshare.com/files/70840341",
+        # "url": "https://ndownloader.figshare.com/files/67163333",
+        "description": "DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs).",
     },
     "charge_atomwise": {
         "category": "atomwise",
@@ -1457,6 +1472,77 @@ ALIGNN2_MODELS = {
         "description": "Per-atom net charge (atomwise head).",
     },
     # --- add new models here (one entry each) ---
+    # --- generative inverse design (ALIGNN-CSP) ------------------------------
+    # Conditional diffusion over lattice + fractional coordinates with an
+    # ALIGNN denoiser. These emit structures rather than properties, so they
+    # are loaded through alignn.inverse.generate.ALIGNNGenerator rather than
+    # the property-prediction path.
+    "csp_supercon_jarvis": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition", "Tc_supercon"],
+        "match_rate": 0.524,
+        "rmsd": 0.056,
+        "figshare_article_id": 33315741,
+        "url": "https://ndownloader.figshare.com/files/67768725",
+        "description": (
+            "ALIGNN-CSP trained from scratch on AtomBench JARVIS "
+            "Supercon-3D; best single benchmark run."
+        ),
+    },
+    "csp_supercon_jarvis_pt": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition", "Tc_supercon"],
+        "match_rate": 0.515,
+        "rmsd": 0.023,
+        "figshare_article_id": 33315744,
+        "url": "https://ndownloader.figshare.com/files/67768728",
+        "description": (
+            "ALIGNN-CSP on JARVIS Supercon-3D, fine-tuned from "
+            "csp_pretrain_dft3d; best coordinate accuracy."
+        ),
+    },
+    "csp_supercon_alex": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition", "Tc"],
+        "match_rate": 0.485,
+        "rmsd": 0.028,
+        "figshare_article_id": 33315747,
+        "url": "https://ndownloader.figshare.com/files/67768731",
+        "description": (
+            "ALIGNN-CSP on AtomBench Alexandria DS-A/B superconductors, "
+            "fine-tuned from csp_pretrain_dft3d."
+        ),
+    },
+    "csp_pretrain_dft3d": {
+        "category": "generative",
+        "graph": "dense",
+        "cutoff": 0.0,
+        "output_features": 0,
+        "target": "structure",
+        "unit": "",
+        "conditioning": ["composition"],
+        "figshare_article_id": 33315750,
+        "url": "https://ndownloader.figshare.com/files/67768734",
+        "description": (
+            "ALIGNN-CSP base model over 65k JARVIS dft_3d crystals with "
+            "benchmark val/test ids held out; for fine-tuning."
+        ),
+    },
 }
 
 _API = "https://api.figshare.com/v2"
@@ -1518,6 +1604,7 @@ def get_alignn2_model(name, download=True, cache_dir=None):
                 f["name"]: f["download_url"] for f in r.json().get("files", [])
             }
             url = files.get(meta.get("zip")) or next(iter(files.values()))
+        print("Obtaining model", name, "from", url)
         r = requests.get(url, stream=True)
         r.raise_for_status()
         zp = os.path.join(dest, "_model.zip")
