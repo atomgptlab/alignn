@@ -1379,11 +1379,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "test_mae": 0.0263,
         "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840662",
         # "url": "https://ndownloader.figshare.com/files/67217507",
-        "description": "ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale.",
+        "description": "ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale. Test MAE 26.3 meV/atom (E) / 0.101 eV/A (F) / 0.528 GPa (S).",
     },
     "matpes_r2scan_ff": {
         "category": "forcefield",
@@ -1392,11 +1392,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "test_mae": 0.0255,
         "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840338",
         # "url": "https://ndownloader.figshare.com/files/67360764",
-        "description": "ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
+        "description": "ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. Test MAE 25.5 meV/atom (E) / 0.128 eV/A (F) / 0.593 GPa (S). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.",
     },
     "omat24_1m_ff": {
         "category": "forcefield",
@@ -1405,10 +1405,10 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": None,
+        "test_mae": 0.0281,
         "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840344",
-        "description": "ALIGNN-FF with per-element embedding trained on OMat24 (1M subset).",
+        "description": "ALIGNN-FF with per-element embedding trained on OMat24 (1M subset). Test MAE 28.1 meV/atom (E) / 0.106 eV/A (F) / 0.737 GPa (S).",
     },
     "mlearn_si": {
         "category": "forcefield",
@@ -1429,11 +1429,11 @@ ALIGNN2_MODELS = {
         "output_features": 1,
         "target": "energy_per_atom",
         "unit": "eV/atom",
-        "test_mae": None,  # TODO: metrics for the per-element-embedding model
+        "test_mae": 0.0179,
         "figshare_article_id": 34846446,
         "url": "https://ndownloader.figshare.com/files/70840341",
         # "url": "https://ndownloader.figshare.com/files/67163333",
-        "description": "DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs).",
+        "description": "DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs). Test MAE 17.9 meV/atom (E) / 0.0586 eV/A (F) / 0.288 GPa (S).",
     },
     "charge_atomwise": {
         "category": "atomwise",
