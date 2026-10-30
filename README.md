@@ -265,6 +265,41 @@ scalar, spectra, or D-dim tensor; radius or kNN graph).
 See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for more,
 and the ASE docs page *Calculators → ALIGNN*.
 
+### Pretrained force fields
+
+Four ALIGNN-FF models with a per-element embedding can be loaded by name
+(figshare [10.6084/m9.figshare.34846446](https://doi.org/10.6084/m9.figshare.34846446),
+CC BY 4.0). `alignn_ff_mptrj` is the default used by `default_path()` and
+`AlignnUnifiedCalculator`.
+
+| Name | Training data | Energy (meV/atom) | Force (meV/Å) | Stress (GPa) |
+|---|---|---|---|---|
+| `alignn_ff_mptrj` (default) | MPtrj | 17.9 | 58.6 | 0.288 |
+| `alignn_ff_matpes_pbe` | MatPES-PBE | 26.3 | 101.2 | 0.528 |
+| `alignn_ff_matpes_r2scan` | MatPES-r2SCAN | 25.5 | 128.1 | 0.593 |
+| `alignn_ff_omat24_1m` | OMat24 (1M subset) | 28.1 | 106.0 | 0.737 |
+
+Errors are on each dataset's test set. The r2SCAN model predicts r2SCAN total
+energies, which are not on the same scale as the PBE models.
+
+```python
+from alignn.ff.ff import get_figshare_model_ff
+from alignn.ff.calculators import AlignnAtomwiseCalculator
+
+model_dir = get_figshare_model_ff(model_name="alignn_ff_matpes_pbe")
+calc = AlignnAtomwiseCalculator(path=model_dir)
+```
+
+The unified calculator takes the name directly:
+`AlignnUnifiedConfig(ff_model="alignn_ff_matpes_pbe")`.
+
+Models download once and are cached by name in `~/.cache/atomgptlab/alignn_ff`
+(set `ATOMGPTLAB_CACHE` to move it). Since 2026.10.11 the older names
+`matpes_pbe` and `matpes_r2scan` also point to these models. If you loaded them
+before that, delete their cache folders to get the new versions. The same
+applies to `matpes_pbe_ff`, `matpes_r2scan_ff` and `mptrj_ff` in
+`alignn.pretrained`, which are cached in `~/.alignn2_models`.
+
 <a name="inverse"></a>
 ## Inverse design — generate structures
 
