@@ -105,10 +105,18 @@ def test_unified_knn_switch():
         calc._prop_models["formation_energy_peratom"]["name"]
         == "formation_energy_peratom_knn"
     )
+    # the knn model was trained with three_body_cutoff 8.0, not the 3.5
+    # default, and its graph must be built the same way
+    assert (
+        calc._prop_models["formation_energy_peratom"]["three_body_cutoff"]
+        == 8.0
+    )
     si = bulk("Si", "diamond", a=5.43)
     si.calc = calc
     si.get_potential_energy()
-    assert math.isfinite(calc.predictions()["formation_energy_peratom"])
+    fe = calc.predictions()["formation_energy_peratom"]
+    # elemental Si is ~0 (0.26 eV/atom with the 3.5 default graph)
+    assert math.isfinite(fe) and abs(fe) < 0.1
 
 
 def test_unified_unknown_property_raises():
