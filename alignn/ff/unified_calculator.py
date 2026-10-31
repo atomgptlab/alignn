@@ -79,7 +79,8 @@ def _load_prop2_model(friendly, graph, device):
     """Load a pure-PyTorch ALIGNN 2.0 property model for `friendly`
     on the requested `graph` ("radius"/"knn"). Scalar, spectra (D>1) and tensor
     outputs are all supported. Returns a dict with the model and its own
-    graph-construction settings (cutoff/max_neighbors/atom_features)."""
+    graph-construction settings (cutoff/max_neighbors/three_body_cutoff/
+    atom_features)."""
     name = _prop2_name(friendly, graph)
     paths = get_alignn2_model(name)
     cfg = _json.load(open(paths["config.json"]))
@@ -95,6 +96,9 @@ def _load_prop2_model(friendly, graph, device):
         "name": name,
         "cutoff": float(cfg.get("cutoff", 5.0)),
         "max_neighbors": int(cfg.get("max_neighbors", 12)),
+        # longest bond used in line-graph triplets, which differs between
+        # models (3.5, 4.0, 8.0). None means every bond, as in training.
+        "three_body_cutoff": cfg.get("three_body_cutoff", 3.5),
         "atom_features": cfg.get("atom_features", "cgcnn"),
         "use_canonize": bool(cfg.get("use_canonize", False)),
     }
@@ -200,6 +204,7 @@ class AlignnUnifiedCalculator(Calculator):
             neighbor_strategy="pure_torch",
             cutoff=info["cutoff"],
             max_neighbors=info["max_neighbors"],
+            three_body_cutoff=info["three_body_cutoff"],
             atom_features=info["atom_features"],
             use_canonize=info["use_canonize"],
         )
