@@ -1059,6 +1059,96 @@ alignn2:
       figshare_article_id: 33135245
       url: https://ndownloader.figshare.com/files/67163651
       description: twod_matpd bandgap (knn).
+    formation_energy_peratom_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: formation_energy_peratom
+      unit: eV/atom
+      test_mae: 0.02836
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945629
+      description: JARVIS-DFT formation_energy_peratom (knn graph), JARVIS leaderboard entry. Test MAE 0.02836 eV/atom.
+    optb88vdw_bandgap_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: optb88vdw_bandgap
+      unit: eV
+      test_mae: 0.1245
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945692
+      description: JARVIS-DFT optb88vdw_bandgap (knn graph), JARVIS leaderboard entry. Test MAE 0.1245 eV.
+    mbj_bandgap_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: mbj_bandgap
+      unit: eV
+      test_mae: 0.2576
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945674
+      description: JARVIS-DFT mbj_bandgap (knn graph), JARVIS leaderboard entry. Test MAE 0.2576 eV.
+    optb88vdw_total_energy_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: optb88vdw_total_energy
+      unit: eV/atom
+      test_mae: 0.02965
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945695
+      description: JARVIS-DFT optb88vdw_total_energy (knn graph), JARVIS leaderboard entry. Test MAE 0.02965 eV/atom.
+    ehull_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: ehull
+      unit: eV/atom
+      test_mae: 0.05136
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945653
+      description: JARVIS-DFT ehull (knn graph), JARVIS leaderboard entry. Test MAE 0.05136 eV/atom.
+    bulk_modulus_kv_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: bulk_modulus_kv
+      unit: GPa
+      test_mae: 9.242
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945641
+      description: JARVIS-DFT bulk_modulus_kv (knn graph), JARVIS leaderboard entry. Test MAE 9.242 GPa.
+    max_efg_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: max_efg
+      unit: '10^21 V/m^2'
+      test_mae: 19.18
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945671
+      description: JARVIS-DFT max_efg (knn graph), trained on the JARVIS leaderboard dft_3d split. Test MAE 19.18 (10^21 V/m^2).
+    spillage_knn_lb:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: spillage
+      unit: ''
+      test_mae: 0.3408
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945707
+      description: JARVIS-DFT spillage (knn graph), JARVIS leaderboard entry. Test MAE 0.3408.
+    oqmd_formation_energy_peratom_knn:
+      graph: knn
+      cutoff: 8.0
+      output_features: 1
+      target: oqmd_formation_energy_peratom
+      unit: eV/atom
+      test_mae: 0.012
+      figshare_article_id: 34875336
+      url: https://ndownloader.figshare.com/files/70945626
+      description: OQMD v1.8 formation_energy_peratom (knn graph), random 90/5/5 split. Test MAE 0.0120 eV/atom.
   spectra:
     a2f:
       graph: radius
