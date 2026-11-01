@@ -271,6 +271,12 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 )
             if model is None:
                 raise ValueError(f"Unsupported model name '{mname}' in config")
+            print(
+                "Loading ALIGNN model",
+                os.path.abspath(os.path.join(path, model_filename)),
+                "on",
+                self.device,
+            )
             if "atomwise" in self.config["model"]["name"]:
                 model.load_state_dict(
                     torch.load(
@@ -292,6 +298,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.model = model
         else:
             model = self.model
+            print("Using ALIGNN model object passed to the calculator")
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""

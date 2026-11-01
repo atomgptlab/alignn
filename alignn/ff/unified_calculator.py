@@ -83,6 +83,7 @@ def _load_prop2_model(friendly, graph, device):
     atom_features)."""
     name = _prop2_name(friendly, graph)
     paths = get_alignn2_model(name)
+    print("Loading ALIGNN property model", name, paths["best_model.pt"])
     cfg = _json.load(open(paths["config.json"]))
     model = ALIGNNAtomWisePure(ALIGNNAtomWisePureConfig(**cfg["model"]))
     model.load_state_dict(
