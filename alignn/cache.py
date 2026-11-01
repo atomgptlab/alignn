@@ -7,8 +7,6 @@ import warnings
 
 from jarvis.core.utils import get_cache_dir
 
-from alignn import __version__
-
 # Caches written before this version may hold models that were since
 # replaced under the same name (e.g. matpes_pbe, matpes_r2scan, mptrj_ff).
 # Raise it whenever a model name is repointed to a new file.
@@ -50,10 +48,9 @@ def check_model_cache():
     stale = [p for p in stale if os.path.isdir(p)]
     if stale:
         warnings.warn(
-            "alignn {}: removing model caches from version {} (< {}), "
+            "alignn: removing model caches from version {} (< {}), "
             "since some model names now point to new models. They will be "
             "re-downloaded on use: {}".format(
-                __version__,
                 cached.strip() if cached else "unknown",
                 MIN_CACHE_VERSION,
                 ", ".join(stale),
@@ -62,4 +59,4 @@ def check_model_cache():
         for p in stale:
             shutil.rmtree(p, ignore_errors=True)
     with open(marker, "w") as f:
-        f.write(__version__)
+        f.write(MIN_CACHE_VERSION)
