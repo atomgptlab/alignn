@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="alignn",
-    version="2026.10.15",
+    version="2026.11.1",
     author="Kamal Choudhary",
     author_email="drkamal@jhu.edu",
     description="alignn",

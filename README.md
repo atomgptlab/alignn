@@ -302,7 +302,7 @@ The previous models are still available as `matpes_pbe_old`,
 `mptrj_ff_old`.
 
 Models download once and are cached by name in `~/.cache/atomgptlab/alignn_ff`
-(set `ATOMGPTLAB_CACHE` to move it). From 2026.10.15, caches written by older
+(set `ATOMGPTLAB_CACHE` to move it). From 2026.11.1, caches written by older
 versions are removed automatically, with a warning, on the first model download,
 so renamed models are fetched again.
 

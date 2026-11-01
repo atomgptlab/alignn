@@ -60,7 +60,7 @@ calc = AlignnAtomwiseCalculator(
 ```
 
 Models are cached in `~/.cache/atomgptlab/alignn_ff` (set `ATOMGPTLAB_CACHE` to
-move it). From 2026.10.15, caches written by older versions are removed
+move it). From 2026.11.1, caches written by older versions are removed
 automatically, with a warning, on the first model download.
 
 ## Default path helper
