@@ -94,7 +94,6 @@ def get_figshare_model_ff(
     zfile = model_name + ".zip"
     path = str(os.path.join(dir_path, zfile))
     # path = str(os.path.join(os.path.dirname(__file__), zfile))
-    print("dir_path", dir_path)
     best_path = os.path.join(dir_path, filename)
     if not os.path.exists(best_path):
         print("Obtaining model", model_name, "from", url)
