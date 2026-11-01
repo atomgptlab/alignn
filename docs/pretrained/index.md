@@ -6,8 +6,9 @@ ALIGNN ships a large catalog of pre-trained checkpoints for direct use.
 - Two CLIs load them: `pretrained.py` (single-property predictors) and
   `run_alignn_ff.py` (universal force-field).
 - Model names and sources are listed in
-  [`alignn/ff/all_models_alignn.json`](https://github.com/atomgptlab/alignn/blob/main/alignn/ff/all_models_alignn.json) and
-  [`alignn/ff/all_models_alignn_atomwise.json`](https://github.com/atomgptlab/alignn/blob/main/alignn/ff/all_models_alignn_atomwise.json).
+  [`alignn/registry/`](https://github.com/atomgptlab/alignn/blob/main/alignn/registry):
+  `alignn_ff.yml` (force fields), `alignn_property.yml` (property predictors)
+  and `alignn_inverse.yml` (generative inverse design).
 
 | Page | What it covers |
 |---|---|

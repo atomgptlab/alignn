@@ -1,0 +1,154 @@
+# ALIGNN force-field models.
+# figshare_ff: name -> zip url (alignn.ff get_figshare_model_ff)
+# alignn2: ALIGNN 2.0 entries by category (alignn.pretrained.get_alignn2_model)
+figshare_ff:
+  dft_3d_307k: https://ndownloader.figshare.com/files/64744104
+  mps: https://ndownloader.figshare.com/files/64744107
+  v12.2.2024_dft_3d_307k: https://ndownloader.figshare.com/files/50904240
+  v12.2.2024_mp_1.5mill: https://ndownloader.figshare.com/files/50904783
+  v12.2.2024_mp_187k: https://ndownloader.figshare.com/files/50904801
+  v10.30.2024_dft_3d_307k: https://ndownloader.figshare.com/files/50634327
+  v10.30.2024_mp_168k: https://ndownloader.figshare.com/files/50634318
+  v8.29.2024_dft_3d: https://ndownloader.figshare.com/files/48889834
+  v8.29.2024_mpf: https://ndownloader.figshare.com/files/48889837
+  v5.27.2024: https://ndownloader.figshare.com/files/47286127
+  alignnff_fmult: https://ndownloader.figshare.com/files/41583585
+  alignnff_wt10: https://ndownloader.figshare.com/files/41583594
+  alignnff_fd: https://ndownloader.figshare.com/files/41583582
+  alignnff_wt01: https://ndownloader.figshare.com/files/41583588
+  alignnff_wt1: https://ndownloader.figshare.com/files/41583591
+  fmult_mlearn_only: https://ndownloader.figshare.com/files/41583597
+  aff_Oct23: https://ndownloader.figshare.com/files/42880573
+  revised: https://ndownloader.figshare.com/files/41583600
+  scf_fd_top_10_en_42_fmax_600_wt01: https://ndownloader.figshare.com/files/41967375
+  scf_fd_top_10_en_42_fmax_600_wt10: https://ndownloader.figshare.com/files/41967372
+  matpes_pbe: https://ndownloader.figshare.com/files/70840662
+  matpes_r2scan: https://ndownloader.figshare.com/files/70840338
+  matpes_pbe_old: https://ndownloader.figshare.com/files/67217507
+  matpes_r2scan_old: https://ndownloader.figshare.com/files/67360764
+  alignn_ff_mptrj: https://ndownloader.figshare.com/files/70840341
+  alignn_ff_matpes_pbe: https://ndownloader.figshare.com/files/70840662
+  alignn_ff_matpes_r2scan: https://ndownloader.figshare.com/files/70840338
+  alignn_ff_omat24_1m: https://ndownloader.figshare.com/files/70840344
+alignn2:
+  forcefield:
+    alignn_ff_db:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: ''
+      test_mae: 0.0564
+      figshare_article_id: 33135200
+      url: https://ndownloader.figshare.com/files/67163606
+      description: ALIGNN-FF-DB force field (radius).
+    fd_ff_base:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: ''
+      test_mae: 0.0445
+      figshare_article_id: 33135203
+      url: https://ndownloader.figshare.com/files/67163609
+      description: FD-FF 1.1M base force field (radius).
+    fd_ff_ev:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: null
+      figshare_article_id: 33134966
+      url: https://ndownloader.figshare.com/files/67163330
+      description: FD-FF + EV/vacancy/surface/interface augmented force field (energy/forces/stress, radius graph).
+    matpes_ff:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.113
+      figshare_article_id: 33134972
+      url: https://ndownloader.figshare.com/files/67163336
+      description: Force field trained on MATPES-PBE (keep_data_order, ep100).
+    matpes_pbe_ff:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.0263
+      figshare_article_id: 34846446
+      url: https://ndownloader.figshare.com/files/70840662
+      description: ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale. Test MAE 26.3 meV/atom (E) / 0.101 eV/A (F) / 0.528 GPa (S).
+    matpes_r2scan_ff:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.0255
+      figshare_article_id: 34846446
+      url: https://ndownloader.figshare.com/files/70840338
+      description: 'ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. Test MAE 25.5 meV/atom (E) / 0.128 eV/A (F) / 0.593 GPa (S). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.'
+    omat24_1m_ff:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.0281
+      figshare_article_id: 34846446
+      url: https://ndownloader.figshare.com/files/70840344
+      description: ALIGNN-FF with per-element embedding trained on OMat24 (1M subset). Test MAE 28.1 meV/atom (E) / 0.106 eV/A (F) / 0.737 GPa (S).
+    mlearn_si:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: ''
+      test_mae: 0.0872
+      figshare_article_id: 33135206
+      url: https://ndownloader.figshare.com/files/67163612
+      description: mlearn Si force field.
+    mptrj_ff:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.0179
+      figshare_article_id: 34846446
+      url: https://ndownloader.figshare.com/files/70840341
+      description: 'DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs). Test MAE 17.9 meV/atom (E) / 0.0586 eV/A (F) / 0.288 GPa (S).'
+    matpes_pbe_ff_old:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.218
+      figshare_article_id: 33148208
+      url: https://ndownloader.figshare.com/files/67217507
+      description: 'Previous model (before 2026.10.15): ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet). PBE energy scale.'
+    matpes_r2scan_ff_old:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.0487
+      figshare_article_id: 33190782
+      url: https://ndownloader.figshare.com/files/67360764
+      description: 'Previous model (before 2026.10.15): ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.'
+    mptrj_ff_old:
+      graph: radius
+      cutoff: 5.0
+      output_features: 1
+      target: energy_per_atom
+      unit: eV/atom
+      test_mae: 0.0707
+      figshare_article_id: 33134969
+      url: https://ndownloader.figshare.com/files/67163333
+      description: 'Previous model (before 2026.10.15): Universal force field trained on MPtrj (~1.5M configs, ep46).'

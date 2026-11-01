@@ -235,6 +235,8 @@ See [docs/pretrained/](docs/pretrained/):
 - [Property predictor](docs/pretrained/property-predictor.md)
 - [ALIGNN-FF](docs/pretrained/alignn-ff.md)
 
+Model names and download links are in [`alignn/registry/`](alignn/registry).
+
 <a name="webapp"></a>
 ## Web-apps
 
@@ -264,6 +266,50 @@ energy/forces/stress plus any pretrained ALIGNN 2.0 property predictors —
 scalar, spectra, or D-dim tensor; radius or kNN graph).
 See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for more,
 and the ASE docs page *Calculators → ALIGNN*.
+
+### Pretrained force fields
+
+Four ALIGNN-FF models with a per-element embedding can be loaded by name
+(figshare [10.6084/m9.figshare.34846446](https://doi.org/10.6084/m9.figshare.34846446),
+CC BY 4.0). `alignn_ff_mptrj` is the default used by `default_path()` and
+`AlignnUnifiedCalculator`.
+
+| Name | Training data | Energy (meV/atom) | Force (meV/Å) | Stress (GPa) |
+|---|---|---|---|---|
+| `alignn_ff_mptrj` (default) | MPtrj | 17.9 | 58.6 | 0.288 |
+| `alignn_ff_matpes_pbe` | MatPES-PBE | 26.3 | 101.2 | 0.528 |
+| `alignn_ff_matpes_r2scan` | MatPES-r2SCAN | 25.5 | 128.1 | 0.593 |
+| `alignn_ff_omat24_1m` | OMat24 (1M subset) | 28.1 | 106.0 | 0.737 |
+
+Errors are on each dataset's test set. The r2SCAN model predicts r2SCAN total
+energies, which are not on the same scale as the PBE models.
+
+```python
+from alignn.ff.ff import get_figshare_model_ff
+from alignn.ff.calculators import AlignnAtomwiseCalculator
+
+model_dir = get_figshare_model_ff(model_name="alignn_ff_matpes_pbe")
+calc = AlignnAtomwiseCalculator(path=model_dir)
+```
+
+The unified calculator takes the name directly:
+`AlignnUnifiedConfig(ff_model="alignn_ff_matpes_pbe")`.
+
+The older names `matpes_pbe` and `matpes_r2scan` (and `matpes_pbe_ff`,
+`matpes_r2scan_ff`, `mptrj_ff` in `alignn.pretrained`) also load these models.
+The previous models are still available as `matpes_pbe_old`,
+`matpes_r2scan_old`, `matpes_pbe_ff_old`, `matpes_r2scan_ff_old` and
+`mptrj_ff_old`.
+
+Models download once and are cached by name in `~/.cache/atomgptlab/alignn_ff`
+(set `ATOMGPTLAB_CACHE` to move it). From 2026.11.1, caches written by older
+versions are removed automatically, with a warning, on the first model download,
+so renamed models are fetched again.
+
+All pretrained models are listed in YAML files under
+[`alignn/registry/`](alignn/registry): `alignn_ff.yml` (force fields),
+`alignn_property.yml` (property predictors) and `alignn_inverse.yml`
+(generative inverse design).
 
 <a name="inverse"></a>
 ## Inverse design — generate structures

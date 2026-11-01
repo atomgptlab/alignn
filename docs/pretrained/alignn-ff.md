@@ -1,9 +1,9 @@
 # Pre-trained ALIGNN-FF
 
-ALIGNN-FF is a universal graph neural network force-field. Several pretrained versions
-are shipped with the package under
-[`alignn/ff/`](https://github.com/atomgptlab/alignn/tree/main/alignn/ff) and on
-[Figshare](https://figshare.com/projects/ALIGNN_models/126478).
+ALIGNN-FF is a universal graph neural network force-field. Pretrained versions
+are hosted on
+[Figshare](https://figshare.com/projects/ALIGNN_models/126478) and downloaded
+by name on first use.
 
 ## CLI
 
@@ -29,22 +29,45 @@ gamma-surface scans, and simple MD — run `-h` to see the full set.
 
 ## Available checkpoints
 
-Model folders bundled with the package:
+Per-element-embedding models (figshare
+[10.6084/m9.figshare.34846446](https://doi.org/10.6084/m9.figshare.34846446)),
+test-set errors:
 
-- `v10.30.2024_dft_3d_307k` — trained on 307k JARVIS-DFT configurations (Oct 2024)
-- `v12.2.2024_dft_3d_307k` — updated December 2024 release
-- `v2024.12.12_dft_3d_multi_prop` — multi-property (energy + atomwise targets)
-- `alignnff_wt01` — weighted loss variant
-- `alex_band_gap`, `jv_mbj_bandgap_alignn` — bandgap-oriented models
+| Name | Training data | Energy (meV/atom) | Force (meV/Å) | Stress (GPa) |
+|---|---|---|---|---|
+| `alignn_ff_mptrj` (default) | MPtrj | 17.9 | 58.6 | 0.288 |
+| `alignn_ff_matpes_pbe` | MatPES-PBE | 26.3 | 101.2 | 0.528 |
+| `alignn_ff_matpes_r2scan` | MatPES-r2SCAN | 25.5 | 128.1 | 0.593 |
+| `alignn_ff_omat24_1m` | OMat24 (1M subset) | 28.1 | 106.0 | 0.737 |
 
-Additional models are listed in
-[`all_models_alignn_atomwise.json`](https://github.com/atomgptlab/alignn/blob/main/alignn/ff/all_models_alignn_atomwise.json).
+The r2SCAN model predicts r2SCAN total energies, which are not on the same
+scale as the PBE models. `matpes_pbe` and `matpes_r2scan` load the same models;
+the previous 2/2/128 versions are `matpes_pbe_old` and `matpes_r2scan_old`.
+
+Earlier releases remain available by name, e.g. `v12.2.2024_dft_3d_307k`,
+`v10.30.2024_dft_3d_307k`, `v5.27.2024`, `mps` and `alignnff_wt01`.
+
+The full list is in
+[`alignn_ff.yml`](https://github.com/atomgptlab/alignn/blob/main/alignn/registry/alignn_ff.yml).
+
+```python
+from alignn.ff.ff import get_figshare_model_ff
+from alignn.ff.calculators import AlignnAtomwiseCalculator
+
+calc = AlignnAtomwiseCalculator(
+    path=get_figshare_model_ff(model_name="alignn_ff_matpes_pbe")
+)
+```
+
+Models are cached in `~/.cache/atomgptlab/alignn_ff` (set `ATOMGPTLAB_CACHE` to
+move it). From 2026.11.1, caches written by older versions are removed
+automatically, with a warning, on the first model download.
 
 ## Default path helper
 
 ```python
 from alignn.ff.ff import default_path
-print(default_path())  # directory containing the default checkpoint
+print(default_path())  # directory of the default alignn_ff_mptrj checkpoint
 ```
 
 ## Using it programmatically

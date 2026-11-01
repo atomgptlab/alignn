@@ -35,7 +35,7 @@ extra config params (optional)
 # Both alignn and alignn_atomwise
 # models are shared
 
-# See: alignn/ff/all_models_alignn.json
+# See: alignn/registry/alignn_property.yml
 # to load as a calculator
 all_models = {
     "jv_formation_energy_peratom_alignn": [
@@ -239,7 +239,7 @@ parser.add_argument(
     "--pure_torch",
     action="store_true",
     help="Use the DGL-free pure-torch model path (ALIGNNAtomWisePure). "
-    "Model names come from all_models_alignn_atomwise.json, e.g. 'mps', "
+    "Model names come from registry/*.yml (figshare_ff), e.g. 'mps', "
     "'formation_energy_peratom', 'mbj_bandgap'. Auto-enabled if DGL is "
     "not installed.",
 )
@@ -406,7 +406,7 @@ def get_figshare_model_pure(model_name="mps", device="cpu"):
     """Download a pure-torch ALIGNN model from figshare and load it.
 
     ``model_name`` must be a key of
-    ``alignn/ff/all_models_alignn_atomwise.json`` (e.g. ``mps``,
+    ``alignn/registry/*.yml (figshare_ff)`` (e.g. ``mps``,
     ``formation_energy_peratom``, ``mbj_bandgap``, ``bulk_modulus_kv``).
     """
     from alignn.ff.ff import get_figshare_model_ff
@@ -494,7 +494,7 @@ def get_prediction(
 
     If ``pure_torch`` is True, or if DGL is not installed, the DGL-free
     ``ALIGNNAtomWisePure`` path is used (models from
-    ``all_models_alignn_atomwise.json``, e.g. ``mps``,
+    ``registry/*.yml (figshare_ff)``, e.g. ``mps``,
     ``formation_energy_peratom``).
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

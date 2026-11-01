@@ -24,28 +24,25 @@ import numpy as np
 from tqdm import tqdm
 import torch
 from jarvis.core.utils import get_cache_dir
+from alignn.cache import check_model_cache
+from alignn.registry import figshare_ff_models, figshare_prop_models
 
 # Reference: https://doi.org/10.1039/D2DD00096B
 
 
 def get_all_models():
-    json_path = os.path.join(
-        os.path.dirname(__file__), "all_models_alignn_atomwise.json"
-    )
-    return loadjson(json_path)
+    return figshare_ff_models()
 
 
 def get_all_models_prop():
-    json_path = os.path.join(
-        os.path.dirname(__file__), "all_models_alignn.json"
-    )
-    return loadjson(json_path)
+    return figshare_prop_models()
 
 
 def get_figshare_model_ff(
     model_name="v5.27.2024", dir_path=None, filename="best_model.pt"
 ):
     """Get ALIGNN-FF torch models from figshare."""
+    check_model_cache()
     all_models_ff = get_all_models()
     # https://doi.org/10.6084/m9.figshare.23695695
     if dir_path is None:
@@ -60,7 +57,6 @@ def get_figshare_model_ff(
     zfile = model_name + ".zip"
     path = str(os.path.join(dir_path, zfile))
     # path = str(os.path.join(os.path.dirname(__file__), zfile))
-    print("dir_path", dir_path)
     best_path = os.path.join(dir_path, filename)
     if not os.path.exists(best_path):
         print("Obtaining model", model_name, "from", url)
@@ -107,7 +103,7 @@ def get_figshare_model_ff(
 def default_path():
     """Get default model path (ALIGNN-FF MPtrj, per-element embedding)."""
     dpath = get_figshare_model_ff(model_name="alignn_ff_mptrj")
-    # dpath = get_figshare_model_ff(model_name="matpes_r2scan")  # previous default
+    # dpath = get_figshare_model_ff(model_name="matpes_r2scan")  # previous
     # dpath = get_figshare_model_ff(model_name="matpes_pbe")  # previous default
     # dpath = get_figshare_model_ff(model_name="v12.2.2024_dft_3d_307k")  # previous
     # dpath = get_figshare_model_ff(model_name="v5.27.2024")
@@ -274,6 +270,12 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
                 )
             if model is None:
                 raise ValueError(f"Unsupported model name '{mname}' in config")
+            print(
+                "Loading ALIGNN model",
+                os.path.abspath(os.path.join(path, model_filename)),
+                "on",
+                self.device,
+            )
             if "atomwise" in self.config["model"]["name"]:
                 model.load_state_dict(
                     torch.load(
@@ -295,6 +297,7 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             self.model = model
         else:
             model = self.model
+            print("Using ALIGNN model object passed to the calculator")
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
