@@ -108,6 +108,7 @@ alignn2:
       figshare_article_id: 33135179
       url: https://ndownloader.figshare.com/files/67163582
       description: Alexandria superconductor Tc (radius).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_debye:
       graph: radius
       cutoff: 5.0
@@ -118,6 +119,7 @@ alignn2:
       figshare_article_id: 33135185
       url: https://ndownloader.figshare.com/files/67163588
       description: Alexandria superconductor debye (radius).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_dosef:
       graph: radius
       cutoff: 5.0
@@ -128,6 +130,7 @@ alignn2:
       figshare_article_id: 33135182
       url: https://ndownloader.figshare.com/files/67163585
       description: Alexandria superconductor dosef (radius).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_la:
       graph: radius
       cutoff: 5.0
@@ -138,6 +141,7 @@ alignn2:
       figshare_article_id: 33135188
       url: https://ndownloader.figshare.com/files/67163591
       description: Alexandria superconductor la (radius).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_wlog:
       graph: radius
       cutoff: 5.0
@@ -148,6 +152,7 @@ alignn2:
       figshare_article_id: 33135191
       url: https://ndownloader.figshare.com/files/67163597
       description: Alexandria superconductor wlog (radius).
+      training_data: https://ndownloader.figshare.com/files/55551155
     avg_elec_mass_radius:
       graph: radius
       cutoff: 5.0
@@ -158,6 +163,7 @@ alignn2:
       figshare_article_id: 33134975
       url: https://ndownloader.figshare.com/files/67163339
       description: JARVIS-DFT avg_elec_mass (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     avg_hole_mass_radius:
       graph: radius
       cutoff: 5.0
@@ -168,6 +174,7 @@ alignn2:
       figshare_article_id: 33134981
       url: https://ndownloader.figshare.com/files/67163345
       description: JARVIS-DFT avg_hole_mass (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     bulk_modulus_kv_radius:
       graph: radius
       cutoff: 5.0
@@ -178,6 +185,7 @@ alignn2:
       figshare_article_id: 33134987
       url: https://ndownloader.figshare.com/files/67163351
       description: JARVIS-DFT bulk_modulus_kv (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     c2db_gap_radius:
       graph: radius
       cutoff: 5.0
@@ -188,6 +196,7 @@ alignn2:
       figshare_article_id: 33135236
       url: https://ndownloader.figshare.com/files/67163642
       description: c2db gap (radius).
+      training_data: https://ndownloader.figshare.com/files/28682010
     dfpt_piezo_max_dielectric_radius:
       graph: radius
       cutoff: 5.0
@@ -198,6 +207,7 @@ alignn2:
       figshare_article_id: 33134993
       url: https://ndownloader.figshare.com/files/67163357
       description: JARVIS-DFT dfpt_piezo_max_dielectric (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810035
     dfpt_piezo_max_dij_radius:
       graph: radius
       cutoff: 5.0
@@ -208,6 +218,7 @@ alignn2:
       figshare_article_id: 33134999
       url: https://ndownloader.figshare.com/files/67163363
       description: JARVIS-DFT dfpt_piezo_max_dij (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810035
     ehull_radius:
       graph: radius
       cutoff: 5.0
@@ -218,6 +229,7 @@ alignn2:
       figshare_article_id: 33135005
       url: https://ndownloader.figshare.com/files/67163369
       description: JARVIS-DFT ehull (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     encut_radius:
       graph: radius
       cutoff: 5.0
@@ -228,6 +240,7 @@ alignn2:
       figshare_article_id: 33135011
       url: https://ndownloader.figshare.com/files/67163375
       description: JARVIS-DFT encut (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     epsx_radius:
       graph: radius
       cutoff: 5.0
@@ -238,6 +251,7 @@ alignn2:
       figshare_article_id: 33135017
       url: https://ndownloader.figshare.com/files/67163381
       description: JARVIS-DFT epsx (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     epsy_radius:
       graph: radius
       cutoff: 5.0
@@ -248,6 +262,7 @@ alignn2:
       figshare_article_id: 33135023
       url: https://ndownloader.figshare.com/files/67163387
       description: JARVIS-DFT epsy (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     epsz_radius:
       graph: radius
       cutoff: 5.0
@@ -258,6 +273,7 @@ alignn2:
       figshare_article_id: 33135029
       url: https://ndownloader.figshare.com/files/67163393
       description: JARVIS-DFT epsz (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     exfoliation_energy_radius:
       graph: radius
       cutoff: 5.0
@@ -268,6 +284,7 @@ alignn2:
       figshare_article_id: 33135041
       url: https://ndownloader.figshare.com/files/67163405
       description: JARVIS-DFT exfoliation_energy (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     formation_energy_peratom_radius:
       graph: radius
       cutoff: 5.0
@@ -278,6 +295,7 @@ alignn2:
       figshare_article_id: 33135047
       url: https://ndownloader.figshare.com/files/67163411
       description: JARVIS-DFT formation_energy_peratom (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     halide_peroskites_HSE_decomp_energy_radius:
       graph: radius
       cutoff: 5.0
@@ -288,6 +306,7 @@ alignn2:
       figshare_article_id: 33135434
       url: https://ndownloader.figshare.com/files/67164215
       description: halide_peroskites HSE_decomp_energy (radius).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_HSE_gap_radius:
       graph: radius
       cutoff: 5.0
@@ -298,6 +317,7 @@ alignn2:
       figshare_article_id: 33135401
       url: https://ndownloader.figshare.com/files/67164101
       description: halide_peroskites HSE_gap (radius).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_PBE_decomp_energy_radius:
       graph: radius
       cutoff: 5.0
@@ -308,6 +328,7 @@ alignn2:
       figshare_article_id: 33135425
       url: https://ndownloader.figshare.com/files/67164152
       description: halide_peroskites PBE_decomp_energy (radius).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_PBE_gap_radius:
       graph: radius
       cutoff: 5.0
@@ -318,6 +339,7 @@ alignn2:
       figshare_article_id: 33135395
       url: https://ndownloader.figshare.com/files/67164095
       description: halide_peroskites PBE_gap (radius).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_Ref_ind_radius:
       graph: radius
       cutoff: 5.0
@@ -328,6 +350,7 @@ alignn2:
       figshare_article_id: 33135416
       url: https://ndownloader.figshare.com/files/67164140
       description: halide_peroskites Ref_ind (radius).
+      training_data: https://ndownloader.figshare.com/files/44619562
     kpoint_length_unit_radius:
       graph: radius
       cutoff: 5.0
@@ -338,6 +361,7 @@ alignn2:
       figshare_article_id: 33135053
       url: https://ndownloader.figshare.com/files/67163420
       description: JARVIS-DFT kpoint_length_unit (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     magmom_oszicar_radius:
       graph: radius
       cutoff: 5.0
@@ -348,6 +372,7 @@ alignn2:
       figshare_article_id: 33135059
       url: https://ndownloader.figshare.com/files/67163426
       description: JARVIS-DFT magmom_oszicar (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810047
     max_efg_radius:
       graph: radius
       cutoff: 5.0
@@ -358,6 +383,7 @@ alignn2:
       figshare_article_id: 33135065
       url: https://ndownloader.figshare.com/files/67163450
       description: JARVIS-DFT max_efg (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mbj_bandgap_radius:
       graph: radius
       cutoff: 5.0
@@ -368,6 +394,7 @@ alignn2:
       figshare_article_id: 33135071
       url: https://ndownloader.figshare.com/files/67163456
       description: JARVIS-DFT mbj_bandgap (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mepsx_radius:
       graph: radius
       cutoff: 5.0
@@ -378,6 +405,7 @@ alignn2:
       figshare_article_id: 33135077
       url: https://ndownloader.figshare.com/files/67163462
       description: JARVIS-DFT mepsx (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mepsy_radius:
       graph: radius
       cutoff: 5.0
@@ -388,6 +416,7 @@ alignn2:
       figshare_article_id: 33135083
       url: https://ndownloader.figshare.com/files/67163468
       description: JARVIS-DFT mepsy (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mepsz_radius:
       graph: radius
       cutoff: 5.0
@@ -398,6 +427,7 @@ alignn2:
       figshare_article_id: 33135089
       url: https://ndownloader.figshare.com/files/67163474
       description: JARVIS-DFT mepsz (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mxene275_formation_energy_radius:
       graph: radius
       cutoff: 5.0
@@ -408,6 +438,7 @@ alignn2:
       figshare_article_id: 33135221
       url: https://ndownloader.figshare.com/files/67163627
       description: mxene275 formation energy (radius).
+      training_data: https://ndownloader.figshare.com/files/41266233
     n_Seebeck_radius:
       graph: radius
       cutoff: 5.0
@@ -418,6 +449,7 @@ alignn2:
       figshare_article_id: 33135095
       url: https://ndownloader.figshare.com/files/67163480
       description: JARVIS-DFT n_Seebeck (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     n_powerfact_radius:
       graph: radius
       cutoff: 5.0
@@ -428,6 +460,7 @@ alignn2:
       figshare_article_id: 33135101
       url: https://ndownloader.figshare.com/files/67163486
       description: JARVIS-DFT n_powerfact (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     omdb_bandgap_radius:
       graph: radius
       cutoff: 5.0
@@ -438,6 +471,7 @@ alignn2:
       figshare_article_id: 33135329
       url: https://ndownloader.figshare.com/files/67163978
       description: omdb bandgap (radius).
+      training_data: https://ndownloader.figshare.com/files/28501761
     optb88vdw_bandgap_radius:
       graph: radius
       cutoff: 5.0
@@ -448,6 +482,7 @@ alignn2:
       figshare_article_id: 33135107
       url: https://ndownloader.figshare.com/files/67163492
       description: JARVIS-DFT optb88vdw_bandgap (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     optb88vdw_total_energy_radius:
       graph: radius
       cutoff: 5.0
@@ -458,6 +493,7 @@ alignn2:
       figshare_article_id: 33135113
       url: https://ndownloader.figshare.com/files/67163501
       description: JARVIS-DFT optb88vdw_total_energy (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     pdbbind_binding_affinity_radius:
       graph: radius
       cutoff: 5.0
@@ -468,6 +504,7 @@ alignn2:
       figshare_article_id: 33135335
       url: https://ndownloader.figshare.com/files/67163984
       description: pdbbind binding_affinity (radius).
+      training_data: https://ndownloader.figshare.com/files/28816368
     polymer_genome_gga_gap_radius:
       graph: radius
       cutoff: 5.0
@@ -478,6 +515,7 @@ alignn2:
       figshare_article_id: 33135230
       url: https://ndownloader.figshare.com/files/67163636
       description: polymer_genome gga_gap (radius).
+      training_data: https://ndownloader.figshare.com/files/26809907
     shear_modulus_gv_radius:
       graph: radius
       cutoff: 5.0
@@ -488,6 +526,7 @@ alignn2:
       figshare_article_id: 33135119
       url: https://ndownloader.figshare.com/files/67163507
       description: JARVIS-DFT shear_modulus_gv (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     slme_radius:
       graph: radius
       cutoff: 5.0
@@ -498,6 +537,7 @@ alignn2:
       figshare_article_id: 33135125
       url: https://ndownloader.figshare.com/files/67163516
       description: JARVIS-DFT slme (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     snumat_Band_gap_HSE_radius:
       graph: radius
       cutoff: 5.0
@@ -508,6 +548,7 @@ alignn2:
       figshare_article_id: 33135974
       url: https://ndownloader.figshare.com/files/67166069
       description: snumat Band_gap_HSE (radius).
+      training_data: https://ndownloader.figshare.com/files/38521736
     spillage_radius:
       graph: radius
       cutoff: 5.0
@@ -518,6 +559,7 @@ alignn2:
       figshare_article_id: 33135131
       url: https://ndownloader.figshare.com/files/67163522
       description: JARVIS-DFT spillage (radius graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     tc_supercon_hydride_radius:
       graph: radius
       cutoff: 5.0
@@ -528,6 +570,7 @@ alignn2:
       figshare_article_id: 33135215
       url: https://ndownloader.figshare.com/files/67163621
       description: Tc_supercon_hydride (radius, retrained pure-torch).
+      training_data: https://ndownloader.figshare.com/files/64391379
     tc_supercon_radius:
       graph: radius
       cutoff: 5.0
@@ -538,6 +581,7 @@ alignn2:
       figshare_article_id: 33135209
       url: https://ndownloader.figshare.com/files/67163615
       description: Tc_supercon (radius).
+      training_data: https://ndownloader.figshare.com/files/64391379
     thermal_cond_radius:
       graph: radius
       cutoff: 5.0
@@ -548,6 +592,7 @@ alignn2:
       figshare_article_id: 33135194
       url: https://ndownloader.figshare.com/files/67163600
       description: Lattice thermal cond. log10(kL) (radius).
+      training_data: https://ndownloader.figshare.com/files/67841763
     twod_matpd_bandgap_radius:
       graph: radius
       cutoff: 5.0
@@ -558,6 +603,7 @@ alignn2:
       figshare_article_id: 33135242
       url: https://ndownloader.figshare.com/files/67163648
       description: twod_matpd bandgap (radius).
+      training_data: https://ndownloader.figshare.com/files/26789006
   knn:
     alex_supercon_Tc_knn:
       graph: knn
@@ -569,6 +615,7 @@ alignn2:
       figshare_article_id: 33217413
       url: https://ndownloader.figshare.com/files/67452759
       description: Alexandria superconductor Tc (kNN).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_debye_knn:
       graph: knn
       cutoff: 8.0
@@ -579,6 +626,7 @@ alignn2:
       figshare_article_id: 33217422
       url: https://ndownloader.figshare.com/files/67452771
       description: Alexandria superconductor Debye temperature (kNN).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_dosef_knn:
       graph: knn
       cutoff: 8.0
@@ -589,6 +637,7 @@ alignn2:
       figshare_article_id: 33217419
       url: https://ndownloader.figshare.com/files/67452762
       description: Alexandria superconductor N(E_F) (kNN).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_la_knn:
       graph: knn
       cutoff: 8.0
@@ -599,6 +648,7 @@ alignn2:
       figshare_article_id: 33217428
       url: https://ndownloader.figshare.com/files/67452774
       description: Alexandria superconductor lambda (kNN).
+      training_data: https://ndownloader.figshare.com/files/55551155
     alex_supercon_wlog_knn:
       graph: knn
       cutoff: 8.0
@@ -609,6 +659,7 @@ alignn2:
       figshare_article_id: 33217431
       url: https://ndownloader.figshare.com/files/67452777
       description: Alexandria superconductor omega_log (kNN).
+      training_data: https://ndownloader.figshare.com/files/55551155
     avg_elec_mass_knn:
       graph: knn
       cutoff: 8.0
@@ -619,6 +670,7 @@ alignn2:
       figshare_article_id: 33134978
       url: https://ndownloader.figshare.com/files/67163342
       description: JARVIS-DFT avg_elec_mass (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     avg_hole_mass_knn:
       graph: knn
       cutoff: 8.0
@@ -629,6 +681,7 @@ alignn2:
       figshare_article_id: 33134984
       url: https://ndownloader.figshare.com/files/67163348
       description: JARVIS-DFT avg_hole_mass (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     bulk_modulus_kv_knn:
       graph: knn
       cutoff: 8.0
@@ -639,6 +692,7 @@ alignn2:
       figshare_article_id: 33134990
       url: https://ndownloader.figshare.com/files/67163354
       description: JARVIS-DFT bulk_modulus_kv (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     c2db_gap_knn:
       graph: knn
       cutoff: 8.0
@@ -649,6 +703,7 @@ alignn2:
       figshare_article_id: 33135239
       url: https://ndownloader.figshare.com/files/67163645
       description: c2db gap (knn).
+      training_data: https://ndownloader.figshare.com/files/28682010
     dfpt_piezo_max_dielectric_knn:
       graph: knn
       cutoff: 8.0
@@ -659,6 +714,7 @@ alignn2:
       figshare_article_id: 33134996
       url: https://ndownloader.figshare.com/files/67163360
       description: JARVIS-DFT dfpt_piezo_max_dielectric (knn graph).
+      training_data: https://ndownloader.figshare.com/files/67810035
     dfpt_piezo_max_dij_knn:
       graph: knn
       cutoff: 8.0
@@ -669,6 +725,7 @@ alignn2:
       figshare_article_id: 33135002
       url: https://ndownloader.figshare.com/files/67163366
       description: JARVIS-DFT dfpt_piezo_max_dij (knn graph).
+      training_data: https://ndownloader.figshare.com/files/67810035
     ehull_knn:
       graph: knn
       cutoff: 8.0
@@ -679,6 +736,7 @@ alignn2:
       figshare_article_id: 33135008
       url: https://ndownloader.figshare.com/files/67163372
       description: JARVIS-DFT ehull (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     encut_knn:
       graph: knn
       cutoff: 8.0
@@ -689,6 +747,7 @@ alignn2:
       figshare_article_id: 33135014
       url: https://ndownloader.figshare.com/files/67163378
       description: JARVIS-DFT encut (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     epsx_knn:
       graph: knn
       cutoff: 8.0
@@ -699,6 +758,7 @@ alignn2:
       figshare_article_id: 33135020
       url: https://ndownloader.figshare.com/files/67163384
       description: JARVIS-DFT epsx (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     epsy_knn:
       graph: knn
       cutoff: 8.0
@@ -709,6 +769,7 @@ alignn2:
       figshare_article_id: 33135026
       url: https://ndownloader.figshare.com/files/67163390
       description: JARVIS-DFT epsy (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     epsz_knn:
       graph: knn
       cutoff: 8.0
@@ -719,6 +780,7 @@ alignn2:
       figshare_article_id: 33135032
       url: https://ndownloader.figshare.com/files/67163396
       description: JARVIS-DFT epsz (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     exfoliation_energy_knn:
       graph: knn
       cutoff: 8.0
@@ -729,6 +791,7 @@ alignn2:
       figshare_article_id: 33135044
       url: https://ndownloader.figshare.com/files/67163408
       description: JARVIS-DFT exfoliation_energy (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     formation_energy_peratom_knn:
       graph: knn
       cutoff: 8.0
@@ -739,6 +802,7 @@ alignn2:
       figshare_article_id: 33135050
       url: https://ndownloader.figshare.com/files/67163414
       description: JARVIS-DFT formation_energy_peratom (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     halide_peroskites_HSE_decomp_energy_knn:
       graph: knn
       cutoff: 8.0
@@ -749,6 +813,7 @@ alignn2:
       figshare_article_id: 33135437
       url: https://ndownloader.figshare.com/files/67164218
       description: halide_peroskites HSE_decomp_energy (knn).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_HSE_gap_knn:
       graph: knn
       cutoff: 8.0
@@ -759,6 +824,7 @@ alignn2:
       figshare_article_id: 33135404
       url: https://ndownloader.figshare.com/files/67164104
       description: halide_peroskites HSE_gap (knn).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_PBE_decomp_energy_knn:
       graph: knn
       cutoff: 8.0
@@ -769,6 +835,7 @@ alignn2:
       figshare_article_id: 33135428
       url: https://ndownloader.figshare.com/files/67164155
       description: halide_peroskites PBE_decomp_energy (knn).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_PBE_gap_knn:
       graph: knn
       cutoff: 8.0
@@ -779,6 +846,7 @@ alignn2:
       figshare_article_id: 33135398
       url: https://ndownloader.figshare.com/files/67164098
       description: halide_peroskites PBE_gap (knn).
+      training_data: https://ndownloader.figshare.com/files/44619562
     halide_peroskites_Ref_ind_knn:
       graph: knn
       cutoff: 8.0
@@ -789,6 +857,7 @@ alignn2:
       figshare_article_id: 33135419
       url: https://ndownloader.figshare.com/files/67164143
       description: halide_peroskites Ref_ind (knn).
+      training_data: https://ndownloader.figshare.com/files/44619562
     hmof_co2:
       graph: knn
       cutoff: 8.0
@@ -799,6 +868,7 @@ alignn2:
       figshare_article_id: 33135173
       url: https://ndownloader.figshare.com/files/67163576
       description: hMOF CO2 uptake (kNN).
+      training_data: https://ndownloader.figshare.com/files/30972655
     hmof_co2_knn:
       graph: knn
       cutoff: 8.0
@@ -809,6 +879,7 @@ alignn2:
       figshare_article_id: 33137036
       url: https://ndownloader.figshare.com/files/67174418
       description: hMOF CO2 uptake (knn graph, epoch-99).
+      training_data: https://ndownloader.figshare.com/files/30972655
     kpoint_length_unit_knn:
       graph: knn
       cutoff: 8.0
@@ -819,6 +890,7 @@ alignn2:
       figshare_article_id: 33135056
       url: https://ndownloader.figshare.com/files/67163423
       description: JARVIS-DFT kpoint_length_unit (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     magmom_oszicar_knn:
       graph: knn
       cutoff: 8.0
@@ -829,6 +901,7 @@ alignn2:
       figshare_article_id: 33135062
       url: https://ndownloader.figshare.com/files/67163429
       description: JARVIS-DFT magmom_oszicar (knn graph).
+      training_data: https://ndownloader.figshare.com/files/67810047
     max_efg_knn:
       graph: knn
       cutoff: 8.0
@@ -839,6 +912,7 @@ alignn2:
       figshare_article_id: 33135068
       url: https://ndownloader.figshare.com/files/67163453
       description: JARVIS-DFT max_efg (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mbj_bandgap_knn:
       graph: knn
       cutoff: 8.0
@@ -849,6 +923,7 @@ alignn2:
       figshare_article_id: 33135074
       url: https://ndownloader.figshare.com/files/67163459
       description: JARVIS-DFT mbj_bandgap (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mepsx_knn:
       graph: knn
       cutoff: 8.0
@@ -859,6 +934,7 @@ alignn2:
       figshare_article_id: 33135080
       url: https://ndownloader.figshare.com/files/67163465
       description: JARVIS-DFT mepsx (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mepsy_knn:
       graph: knn
       cutoff: 8.0
@@ -869,6 +945,7 @@ alignn2:
       figshare_article_id: 33135086
       url: https://ndownloader.figshare.com/files/67163471
       description: JARVIS-DFT mepsy (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mepsz_knn:
       graph: knn
       cutoff: 8.0
@@ -879,6 +956,7 @@ alignn2:
       figshare_article_id: 33135092
       url: https://ndownloader.figshare.com/files/67163477
       description: JARVIS-DFT mepsz (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     mxene275_formation_energy_knn:
       graph: knn
       cutoff: 8.0
@@ -889,6 +967,7 @@ alignn2:
       figshare_article_id: 33135224
       url: https://ndownloader.figshare.com/files/67163630
       description: mxene275 formation energy (kNN).
+      training_data: https://ndownloader.figshare.com/files/41266233
     n_Seebeck_knn:
       graph: knn
       cutoff: 8.0
@@ -899,6 +978,7 @@ alignn2:
       figshare_article_id: 33135098
       url: https://ndownloader.figshare.com/files/67163483
       description: JARVIS-DFT n_Seebeck (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     n_powerfact_knn:
       graph: knn
       cutoff: 8.0
@@ -909,6 +989,7 @@ alignn2:
       figshare_article_id: 33135104
       url: https://ndownloader.figshare.com/files/67163489
       description: JARVIS-DFT n_powerfact (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     omdb_bandgap_knn:
       graph: knn
       cutoff: 8.0
@@ -919,6 +1000,7 @@ alignn2:
       figshare_article_id: 33135332
       url: https://ndownloader.figshare.com/files/67163981
       description: omdb bandgap (knn).
+      training_data: https://ndownloader.figshare.com/files/28501761
     optb88vdw_bandgap_knn:
       graph: knn
       cutoff: 8.0
@@ -929,6 +1011,7 @@ alignn2:
       figshare_article_id: 33135110
       url: https://ndownloader.figshare.com/files/67163495
       description: JARVIS-DFT optb88vdw_bandgap (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     optb88vdw_total_energy_knn:
       graph: knn
       cutoff: 8.0
@@ -939,6 +1022,7 @@ alignn2:
       figshare_article_id: 33135116
       url: https://ndownloader.figshare.com/files/67163504
       description: JARVIS-DFT optb88vdw_total_energy (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     pdbbind_binding_affinity_knn:
       graph: knn
       cutoff: 8.0
@@ -949,6 +1033,7 @@ alignn2:
       figshare_article_id: 33135338
       url: https://ndownloader.figshare.com/files/67163987
       description: pdbbind binding_affinity (knn).
+      training_data: https://ndownloader.figshare.com/files/28816368
     polymer_genome_gga_gap_knn:
       graph: knn
       cutoff: 8.0
@@ -959,6 +1044,7 @@ alignn2:
       figshare_article_id: 33135233
       url: https://ndownloader.figshare.com/files/67163639
       description: polymer_genome gga_gap (knn).
+      training_data: https://ndownloader.figshare.com/files/26809907
     qm9_gap:
       graph: knn
       cutoff: 8.0
@@ -969,6 +1055,7 @@ alignn2:
       figshare_article_id: 33135167
       url: https://ndownloader.figshare.com/files/67163570
       description: QM9 HOMO-LUMO gap (kNN).
+      training_data: https://ndownloader.figshare.com/files/28715319
     qmof_bandgap:
       graph: knn
       cutoff: 8.0
@@ -979,6 +1066,7 @@ alignn2:
       figshare_article_id: 33135170
       url: https://ndownloader.figshare.com/files/67163573
       description: QMOF bandgap (kNN).
+      training_data: https://ndownloader.figshare.com/files/30972640
     shear_modulus_gv_knn:
       graph: knn
       cutoff: 8.0
@@ -989,6 +1077,7 @@ alignn2:
       figshare_article_id: 33135122
       url: https://ndownloader.figshare.com/files/67163510
       description: JARVIS-DFT shear_modulus_gv (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     slme_knn:
       graph: knn
       cutoff: 8.0
@@ -999,6 +1088,7 @@ alignn2:
       figshare_article_id: 33135128
       url: https://ndownloader.figshare.com/files/67163519
       description: JARVIS-DFT slme (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     snumat_Band_gap_HSE_knn:
       graph: knn
       cutoff: 8.0
@@ -1009,6 +1099,7 @@ alignn2:
       figshare_article_id: 33135977
       url: https://ndownloader.figshare.com/files/67166072
       description: snumat Band_gap_HSE (knn).
+      training_data: https://ndownloader.figshare.com/files/38521736
     spillage_knn:
       graph: knn
       cutoff: 8.0
@@ -1019,6 +1110,7 @@ alignn2:
       figshare_article_id: 33135134
       url: https://ndownloader.figshare.com/files/67163525
       description: JARVIS-DFT spillage (knn graph).
+      training_data: https://ndownloader.figshare.com/files/64391379
     tc_supercon_hydride_knn:
       graph: knn
       cutoff: 8.0
@@ -1029,6 +1121,7 @@ alignn2:
       figshare_article_id: 33135218
       url: https://ndownloader.figshare.com/files/67163624
       description: Tc_supercon_hydride (kNN, retrained pure-torch).
+      training_data: https://ndownloader.figshare.com/files/64391379
     tc_supercon_knn:
       graph: knn
       cutoff: 8.0
@@ -1039,6 +1132,7 @@ alignn2:
       figshare_article_id: 33135212
       url: https://ndownloader.figshare.com/files/67163618
       description: Tc_supercon (kNN).
+      training_data: https://ndownloader.figshare.com/files/64391379
     thermal_cond_knn:
       graph: knn
       cutoff: 8.0
@@ -1049,6 +1143,7 @@ alignn2:
       figshare_article_id: 33135197
       url: https://ndownloader.figshare.com/files/67163603
       description: Lattice thermal cond. log10(kL) (kNN).
+      training_data: https://ndownloader.figshare.com/files/67841763
     twod_matpd_bandgap_knn:
       graph: knn
       cutoff: 8.0
@@ -1059,6 +1154,7 @@ alignn2:
       figshare_article_id: 33135245
       url: https://ndownloader.figshare.com/files/67163651
       description: twod_matpd bandgap (knn).
+      training_data: https://ndownloader.figshare.com/files/26789006
     formation_energy_peratom_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1069,6 +1165,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945629
       description: JARVIS-DFT formation_energy_peratom (knn graph), JARVIS leaderboard entry. Test MAE 0.02836 eV/atom.
+      training_data: https://ndownloader.figshare.com/files/64391379
     optb88vdw_bandgap_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1079,6 +1176,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945692
       description: JARVIS-DFT optb88vdw_bandgap (knn graph), JARVIS leaderboard entry. Test MAE 0.1245 eV.
+      training_data: https://ndownloader.figshare.com/files/64391379
     mbj_bandgap_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1089,6 +1187,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945674
       description: JARVIS-DFT mbj_bandgap (knn graph), JARVIS leaderboard entry. Test MAE 0.2576 eV.
+      training_data: https://ndownloader.figshare.com/files/64391379
     optb88vdw_total_energy_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1099,6 +1198,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945695
       description: JARVIS-DFT optb88vdw_total_energy (knn graph), JARVIS leaderboard entry. Test MAE 0.02965 eV/atom.
+      training_data: https://ndownloader.figshare.com/files/64391379
     ehull_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1109,6 +1209,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945653
       description: JARVIS-DFT ehull (knn graph), JARVIS leaderboard entry. Test MAE 0.05136 eV/atom.
+      training_data: https://ndownloader.figshare.com/files/64391379
     bulk_modulus_kv_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1119,6 +1220,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945641
       description: JARVIS-DFT bulk_modulus_kv (knn graph), JARVIS leaderboard entry. Test MAE 9.242 GPa.
+      training_data: https://ndownloader.figshare.com/files/64391379
     max_efg_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1129,6 +1231,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945671
       description: JARVIS-DFT max_efg (knn graph), trained on the JARVIS leaderboard dft_3d split. Test MAE 19.18 (10^21 V/m^2).
+      training_data: https://ndownloader.figshare.com/files/64391379
     spillage_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1139,6 +1242,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945707
       description: JARVIS-DFT spillage (knn graph), JARVIS leaderboard entry. Test MAE 0.3408.
+      training_data: https://ndownloader.figshare.com/files/64391379
     oqmd_formation_energy_peratom_knn:
       graph: knn
       cutoff: 8.0
@@ -1149,6 +1253,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945626
       description: OQMD v1.8 formation_energy_peratom (knn graph), random 90/5/5 split. Test MAE 0.0120 eV/atom.
+      training_data: ''
   spectra:
     a2f:
       graph: radius
@@ -1160,6 +1265,7 @@ alignn2:
       figshare_article_id: 33217434
       url: https://ndownloader.figshare.com/files/67452780
       description: Eliashberg alpha^2F(omega) spectral function, 100-bin 0-110.8 meV (radius graph, supercon_3d).
+      training_data: https://ndownloader.figshare.com/files/67810038
     dielectric_knn:
       graph: knn
       cutoff: 8.0
@@ -1170,6 +1276,7 @@ alignn2:
       figshare_article_id: 33135266
       url: https://ndownloader.figshare.com/files/67163663
       description: TBmBJ dielectric function imag_xx 300-bin 0-15 eV (knn graph).
+      training_data: https://ndownloader.figshare.com/files/67810044
     dielectric_radius:
       graph: radius
       cutoff: 5.0
@@ -1180,6 +1287,7 @@ alignn2:
       figshare_article_id: 33135254
       url: https://ndownloader.figshare.com/files/67163660
       description: TBmBJ dielectric function imag_xx 300-bin 0-15 eV (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810044
     edos:
       graph: radius
       cutoff: 5.0
@@ -1190,6 +1298,7 @@ alignn2:
       figshare_article_id: 33135158
       url: https://ndownloader.figshare.com/files/67163561
       description: 300-bin electronic DOS (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810056
     ir_knn:
       graph: knn
       cutoff: 8.0
@@ -1200,6 +1309,7 @@ alignn2:
       figshare_article_id: 33135251
       url: https://ndownloader.figshare.com/files/67163657
       description: IR spectrum 200-bin 0-2000 cm^-1 (knn graph).
+      training_data: https://ndownloader.figshare.com/files/67810050
     ir_radius:
       graph: radius
       cutoff: 5.0
@@ -1210,6 +1320,7 @@ alignn2:
       figshare_article_id: 33135248
       url: https://ndownloader.figshare.com/files/67163654
       description: IR spectrum 200-bin 0-2000 cm^-1 (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810050
     pdos:
       graph: radius
       cutoff: 5.0
@@ -1220,6 +1331,7 @@ alignn2:
       figshare_article_id: 33135164
       url: https://ndownloader.figshare.com/files/67163567
       description: 200-bin phonon DOS (radius graph).
+      training_data: https://ndownloader.figshare.com/files/67810062
     raman_knn:
       graph: knn
       cutoff: 8.0
@@ -1230,6 +1342,7 @@ alignn2:
       figshare_article_id: 33134963
       url: https://ndownloader.figshare.com/files/67163327
       description: 200-bin Raman spectrum (kNN graph).
+      training_data: https://ndownloader.figshare.com/files/67810053
   tensor:
     born_tensor:
       graph: radius
@@ -1241,6 +1354,7 @@ alignn2:
       figshare_article_id: 33135155
       url: https://ndownloader.figshare.com/files/67163558
       description: born response tensor (D=1).
+      training_data: https://ndownloader.figshare.com/files/67810035
     dielectric_tensor:
       graph: radius
       cutoff: 5.0
@@ -1251,6 +1365,7 @@ alignn2:
       figshare_article_id: 33135143
       url: https://ndownloader.figshare.com/files/67163546
       description: dielectric response tensor (D=9).
+      training_data: https://ndownloader.figshare.com/files/67810035
     elastic_tensor:
       graph: radius
       cutoff: 5.0
@@ -1261,6 +1376,7 @@ alignn2:
       figshare_article_id: 33135152
       url: https://ndownloader.figshare.com/files/67163555
       description: elastic response tensor (D=36).
+      training_data: https://ndownloader.figshare.com/files/67810041
     piezo_tensor:
       graph: radius
       cutoff: 5.0
@@ -1271,6 +1387,7 @@ alignn2:
       figshare_article_id: 33135149
       url: https://ndownloader.figshare.com/files/67163552
       description: piezo response tensor (D=18).
+      training_data: https://ndownloader.figshare.com/files/67810035
   atomwise:
     charge_atomwise:
       graph: radius
@@ -1282,6 +1399,7 @@ alignn2:
       figshare_article_id: 33135137
       url: https://ndownloader.figshare.com/files/67163528
       description: Per-atom charge (atomwise head).
+      training_data: https://ndownloader.figshare.com/files/64391379
     magmom_atomwise:
       graph: radius
       cutoff: 5.0
@@ -1292,6 +1410,7 @@ alignn2:
       figshare_article_id: 33135140
       url: https://ndownloader.figshare.com/files/67163543
       description: Per-atom magmom (atomwise head).
+      training_data: https://ndownloader.figshare.com/files/67810047
     net_charge_atomwise:
       graph: radius
       cutoff: 5.0
@@ -1302,3 +1421,4 @@ alignn2:
       figshare_article_id: 33135227
       url: https://ndownloader.figshare.com/files/67163633
       description: Per-atom net charge (atomwise head).
+      training_data: https://ndownloader.figshare.com/files/67810047

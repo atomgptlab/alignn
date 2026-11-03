@@ -42,6 +42,7 @@ alignn2:
       figshare_article_id: 33135200
       url: https://ndownloader.figshare.com/files/67163606
       description: ALIGNN-FF-DB force field (radius).
+      training_data: https://ndownloader.figshare.com/files/67810065
     fd_ff_base:
       graph: radius
       cutoff: 5.0
@@ -52,6 +53,7 @@ alignn2:
       figshare_article_id: 33135203
       url: https://ndownloader.figshare.com/files/67163609
       description: FD-FF 1.1M base force field (radius).
+      training_data: ''
     fd_ff_ev:
       graph: radius
       cutoff: 5.0
@@ -62,6 +64,7 @@ alignn2:
       figshare_article_id: 33134966
       url: https://ndownloader.figshare.com/files/67163330
       description: FD-FF + EV/vacancy/surface/interface augmented force field (energy/forces/stress, radius graph).
+      training_data: ''
     matpes_ff:
       graph: radius
       cutoff: 5.0
@@ -72,6 +75,7 @@ alignn2:
       figshare_article_id: 33134972
       url: https://ndownloader.figshare.com/files/67163336
       description: Force field trained on MATPES-PBE (keep_data_order, ep100).
+      training_data: ''
     matpes_pbe_ff:
       graph: radius
       cutoff: 5.0
@@ -82,6 +86,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840662
       description: ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale. Test MAE 26.3 meV/atom (E) / 0.101 eV/A (F) / 0.528 GPa (S).
+      training_data: ''
     matpes_r2scan_ff:
       graph: radius
       cutoff: 5.0
@@ -92,6 +97,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840338
       description: 'ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. Test MAE 25.5 meV/atom (E) / 0.128 eV/A (F) / 0.593 GPa (S). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.'
+      training_data: ''
     omat24_1m_ff:
       graph: radius
       cutoff: 5.0
@@ -102,6 +108,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840344
       description: ALIGNN-FF with per-element embedding trained on OMat24 (1M subset). Test MAE 28.1 meV/atom (E) / 0.106 eV/A (F) / 0.737 GPa (S).
+      training_data: ''
     mlearn_si:
       graph: radius
       cutoff: 5.0
@@ -112,6 +119,7 @@ alignn2:
       figshare_article_id: 33135206
       url: https://ndownloader.figshare.com/files/67163612
       description: mlearn Si force field.
+      training_data: https://ndownloader.figshare.com/files/40357663
     mptrj_ff:
       graph: radius
       cutoff: 5.0
@@ -122,6 +130,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840341
       description: 'DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs). Test MAE 17.9 meV/atom (E) / 0.0586 eV/A (F) / 0.288 GPa (S).'
+      training_data: ''
     matpes_pbe_ff_old:
       graph: radius
       cutoff: 5.0
@@ -132,6 +141,7 @@ alignn2:
       figshare_article_id: 33148208
       url: https://ndownloader.figshare.com/files/67217507
       description: 'Previous model (before 2026.10.15): ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-PBE ep100; NVE-stable (Si/MgO/Cu ~CHGNet). PBE energy scale.'
+      training_data: https://ndownloader.figshare.com/files/67810047
     matpes_r2scan_ff_old:
       graph: radius
       cutoff: 5.0
@@ -142,6 +152,7 @@ alignn2:
       figshare_article_id: 33190782
       url: https://ndownloader.figshare.com/files/67360764
       description: 'Previous model (before 2026.10.15): ALIGNN 2.0 force field: 2/2/128, smooth cutoff (multiply_cutoff, inner_cutoff 4.0), nbr52, MATPES-r2SCAN ep100. Test MAE 48.7 meV/atom (E) / 0.163 eV/A (F); NVE-stable; chipsff vacancy MAE 0.775 eV (r2SCAN chempots). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.'
+      training_data: ''
     mptrj_ff_old:
       graph: radius
       cutoff: 5.0
@@ -152,3 +163,4 @@ alignn2:
       figshare_article_id: 33134969
       url: https://ndownloader.figshare.com/files/67163333
       description: 'Previous model (before 2026.10.15): Universal force field trained on MPtrj (~1.5M configs, ep46).'
+      training_data: ''

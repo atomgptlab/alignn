@@ -18,6 +18,7 @@ alignn2:
       figshare_article_id: 33315741
       url: https://ndownloader.figshare.com/files/67768725
       description: ALIGNN-CSP trained from scratch on AtomBench JARVIS Supercon-3D; best single benchmark run.
+      training_data: https://ndownloader.figshare.com/files/38307921
     csp_supercon_jarvis_pt:
       graph: dense
       cutoff: 0.0
@@ -32,6 +33,7 @@ alignn2:
       figshare_article_id: 33315744
       url: https://ndownloader.figshare.com/files/67768728
       description: ALIGNN-CSP on JARVIS Supercon-3D, fine-tuned from csp_pretrain_dft3d; best coordinate accuracy.
+      training_data: https://ndownloader.figshare.com/files/38307921
     csp_supercon_alex:
       graph: dense
       cutoff: 0.0
@@ -46,6 +48,7 @@ alignn2:
       figshare_article_id: 33315747
       url: https://ndownloader.figshare.com/files/67768731
       description: ALIGNN-CSP on AtomBench Alexandria DS-A/B superconductors, fine-tuned from csp_pretrain_dft3d.
+      training_data: https://ndownloader.figshare.com/files/55551155
     csp_pretrain_dft3d:
       graph: dense
       cutoff: 0.0
@@ -57,3 +60,4 @@ alignn2:
       figshare_article_id: 33315750
       url: https://ndownloader.figshare.com/files/67768734
       description: ALIGNN-CSP base model over 65k JARVIS dft_3d crystals with benchmark val/test ids held out; for fine-tuning.
+      training_data: https://ndownloader.figshare.com/files/64391379
