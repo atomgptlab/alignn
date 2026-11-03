@@ -11,13 +11,13 @@
 # Table of Contents
 * [Introduction](#intro)
 * [Installation](#install)
-* [Examples — train every model type](#example)
+* [Examples: train every model type](#example)
 * [Reproducing a JARVIS-Leaderboard contribution](#reproduce)
 * [Colab notebooks](#colab)
 * [Pre-trained models](#pretrained)
 * [JARVIS-ALIGNN webapp](#webapp)
 * [ALIGNN-FF & ASE Calculator](#alignnff)
-* [Inverse design — generate structures](#inverse)
+* [Inverse design: generate structures](#inverse)
 * [Peformances on a few datasets](#performances)
 * [Useful notes](#notes)
 * [References](#refs)
@@ -32,7 +32,7 @@ The Atomistic Line Graph Neural Network ([paper](https://www.nature.com/articles
 
 ![ALIGNN layer schematic](https://github.com/atomgptlab/alignn/blob/develop/alignn/tex/schematic_lg.jpg)
 
-> ⚡ **Pure PyTorch — DGL is no longer required.** ALIGNN now runs fully in
+> ⚡ **Pure PyTorch: DGL is no longer required.** ALIGNN now runs fully in
 > native PyTorch. Neighbor lists, line graphs, and batched readout are all
 > built with plain torch tensor/scatter ops via
 > [`alignn/torch_graph_builder.py`](alignn/torch_graph_builder.py), so you can
@@ -47,7 +47,7 @@ The Atomistic Line Graph Neural Network ([paper](https://www.nature.com/articles
 See [docs/installation.md](docs/installation.md) for conda, GitHub, and pip installation methods.
 
 <a name="example"></a>
-## Examples — train every model type
+## Examples: train every model type
 
 All training recipes live on this page. Each one ships a **self-contained,
 runnable example** under [`alignn/examples/recipes/`](alignn/examples/recipes/)
@@ -75,9 +75,9 @@ an inline jarvis `Atoms` dict, and the target(s). See
 [Dataset format](docs/training/dataset-format.md) for the full spec.
 
 <details>
-<summary><b>1. kNN graph — scalar property</b> (formation energy, band gap, Tc, …)</summary>
+<summary><b>1. kNN graph: scalar property</b> (formation energy, band gap, Tc, …)</summary>
 
-Wider k-nearest-neighbour graph (`cutoff: 8.0`, `max_neighbors: 12`) — the more
+Wider k-nearest-neighbour graph (`cutoff: 8.0`, `max_neighbors: 12`), the more
 accurate choice for property prediction.
 
 ```bash
@@ -91,10 +91,10 @@ Key knobs: `cutoff: 8.0`, `model.output_features: 1`, `graphwise_weight: 1.0`,
 </details>
 
 <details>
-<summary><b>2. Radius graph — scalar property</b> (MD-compatible neighbour list)</summary>
+<summary><b>2. Radius graph: scalar property</b> (MD-compatible neighbour list)</summary>
 
 Same scalar task, but the fixed-radius graph (`cutoff: 5.0`) that is continuous
-under displacement — use it when you need MD-consistency.
+under displacement; use it when you need MD-consistency.
 
 ```bash
 cd alignn/examples/recipes/radius
@@ -139,7 +139,7 @@ toy script. More: [recipes/spectra/README.md](alignn/examples/recipes/spectra/RE
 <summary><b>5. Force field</b> (energy + forces + stress, ALIGNN-FF)</summary>
 
 Train an interatomic potential with energy-conserving (gradient) forces and
-stress — usable for relaxation, MD, and LAMMPS (`pair_alignn`).
+stress, usable for relaxation, MD, and LAMMPS (`pair_alignn`).
 
 ```bash
 cd alignn/examples/recipes/forcefield
@@ -202,7 +202,7 @@ bash jarvis_leaderboard/contributions/alignn_model/run.sh
 `run.sh` downloads the benchmark's train/val/test split (from the matching
 `jarvis_leaderboard/benchmarks/.../*.json.zip`), writes the `id_prop`/config, and
 calls `train_alignn.py` with the same settings that produced the leaderboard
-number — so you reproduce the published MAE exactly. To submit a new ALIGNN
+number, so you reproduce the published MAE exactly. To submit a new ALIGNN
 result, copy an existing contribution folder, drop in your predictions CSV +
 `metadata.json`, and open a PR (see the leaderboard's `CONTRIBUTING`).
 
@@ -262,7 +262,7 @@ print(calc.predictions())                    # extra property predictors
 ```
 
 A single pydantic config selects the outputs (force-field
-energy/forces/stress plus any pretrained ALIGNN 2.0 property predictors —
+energy/forces/stress plus any pretrained ALIGNN 2.0 property predictors:
 scalar, spectra, or D-dim tensor; radius or kNN graph).
 See [docs/usage/ase-calculator.md](docs/usage/ase-calculator.md) for more,
 and the ASE docs page *Calculators → ALIGNN*.
@@ -312,7 +312,7 @@ All pretrained models are listed in YAML files under
 (generative inverse design).
 
 <a name="inverse"></a>
-## Inverse design — generate structures
+## Inverse design: generate structures
 
 The same line graph also runs backwards. **ALIGNN-CSP** is a conditional
 diffusion model over the lattice and the fractional coordinates that takes a
@@ -358,7 +358,7 @@ list_alignn2_models("generative")
 ALIGNNGenerator(model="csp_supercon_jarvis_pt")   # pick a different one
 ```
 
-Conditioning is pluggable rather than fixed to one property — a scalar (Tc,
+Conditioning is pluggable rather than fixed to one property: a scalar (Tc,
 band gap), the composition, a 1-D signal such as an XRD pattern, or a 2-D map
 such as a STEM image. Each is dropped independently during training, so one
 checkpoint can generate from any subset at sampling time.
@@ -373,15 +373,15 @@ reproducing the AtomBench benchmarks is covered in
 That page also carries a full reference for an optional research extension,
 off by default: making bond angles an explicit **denoising channel** rather
 than only an input feature, with a line-graph topology that varies
-continuously as the coordinates denoise. See *Explicit bond-angle diffusion —
-reference* for the mathematics, the per-ablation breakdown, what each design
+continuously as the coordinates denoise. See the *Explicit bond-angle diffusion* reference in
+[alignn/inverse/README.md](alignn/inverse/README.md) for the mathematics, the per-ablation breakdown, what each design
 choice takes from the literature, and the bibliography.
 
 <a name="performances"></a>
 ## Performances
 
 ALIGNN 2.0 benchmarked across single-property, multi-property (spectra / per-atom /
-tensor), and interatomic-force-field tasks — the latter including universal-potential
+tensor), and interatomic-force-field tasks, the latter including universal-potential
 stability on Matbench-Discovery / WBM (256,963 materials) and the CHIPS-FF
 material-property suite (lattice, elastic, vacancy, surface). Columns compare ALIGNN 2.0
 on the radius and 8 Å kNN graphs against the original ALIGNN and CGCNN; **bold** marks the row best.
@@ -392,7 +392,7 @@ continually-updated numbers see the
 <details>
 <summary><b>Full benchmark table (54 tasks)</b></summary>
 
-**(a) Single-property prediction — test MAE**
+**(a) Single-property prediction: test MAE**
 
 | # | Task (unit) | N tr/val/te | ALIGNN 2.0 (radius) | ALIGNN 2.0 (kNN) | orig. ALIGNN | CGCNN | Baseline (MAD) | Skill % |
 |---|---|---|---|---|---|---|---|---|
@@ -435,7 +435,7 @@ continually-updated numbers see the
 | 37 | alex_supercon λ | 6592/824/825 | 0.0707 | **0.0679** |   |   | 0.194 | 65.0 |
 | 38 | alex_supercon ω_log (K) | 6592/824/825 | 20.31 | **20.08** |   |   | 55.37 | 63.7 |
 
-**(b) Multi-property — spectra / per-atom / tensor; held-out MAE (col. "radius")**
+**(b) Multi-property: spectra / per-atom / tensor; held-out MAE (col. "radius")**
 
 | # | Task (unit) | N tr/val/te | ALIGNN 2.0 (radius) | ALIGNN 2.0 (kNN) | orig. ALIGNN | CGCNN | Baseline (MAD) | Skill % |
 |---|---|---|---|---|---|---|---|---|
@@ -450,7 +450,7 @@ continually-updated numbers see the
 | 47 | Piezoelectric tensor, C/m^2 (D=18) | 4513/250/252 | 0.077 |   |   |   | 0.089 | 13.9 |
 | 48 | Elastic C_{ij} tensor, GPa (D=36) | 15,936/885/886 | 5.593 |   |   |   | 18.73 | 70.1 |
 
-**(c) Interatomic force fields — `mlearn` per-element energy/force; large sets energy / force**
+**(c) Interatomic force fields: `mlearn` per-element energy/force; large sets energy / force**
 
 | # | Task (unit) | N tr/val/te | ALIGNN 2.0 (radius) | ALIGNN 2.0 (kNN) | orig. ALIGNN | CGCNN | Baseline (MAD) | Skill % |
 |---|---|---|---|---|---|---|---|---|
@@ -463,7 +463,7 @@ continually-updated numbers see the
 *Blank cells: not run for that graph/model. `–`: baseline unavailable or ill-defined.
 ‡ `mlearn` MAE pending re-verification against a consistent per-atom energy convention.*
 
-**(d) Universal force fields — Matbench-Discovery / WBM (full 256,963-material set)**
+**(d) Universal force fields: Matbench-Discovery / WBM (full 256,963-material set)**
 
 Five ALIGNN-FF (AFF) variants share one architecture; UMA / M3GNet / MACE-MP-0 /
 CHGNet are external baselines run through the identical pipeline. Stability F1 and
@@ -482,7 +482,7 @@ MAE, and diatomic tortuosity τ (ideal 1) are lower-is-better.
 | MACE-MP-0 | – | – | 0.143 | 0.430 | 2.08 | 0.097 | 1.60 |
 | CHGNet | – | – | 0.098 | 0.459 | 1.84 | 0.101 | 9.63 |
 
-**(e) Universal force fields — CHIPS-FF material properties** (MAE vs JARVIS-DFT; single relax-and-evaluate)
+**(e) Universal force fields: CHIPS-FF material properties** (MAE vs JARVIS-DFT; single relax-and-evaluate)
 
 Lattice `a,c`; formation `E_f`; elastic `C11,C44,Kv`; monovacancy (Vac) and surface (Surf) energies.
 
@@ -498,7 +498,7 @@ Lattice `a,c`; formation `E_f`; elastic `C11,C44,Kv`; monovacancy (Vac) and surf
 | UMA-S | 0.026 | **0.029** | 0.076 | **29.7** | 35.2 | 85.3 | **0.464** | **0.122** |
 | M3GNet-MatPES-PBE | 0.038 | 0.049 | 0.148 | 49.3 | **33.2** | 83.5 | 0.928 | 0.297 |
 
-**(f) Inverse design — ALIGNN-CSP crystal-structure reconstruction** (AtomBench protocol)
+**(f) Inverse design: ALIGNN-CSP crystal-structure reconstruction** (AtomBench protocol)
 
 Conditional generation scored against the target structure: match rate ↑, coordinate
 RMSD / composition-conditioned ccRMSD / lattice KLD ↓. Baselines from AtomBench;
@@ -530,7 +530,7 @@ single run on Alexandria.
 
 **Pure-PyTorch path (no DGL)**
 
-- ALIGNN 2.0 runs fully in native PyTorch — set the model name to a `*_pure` variant
+- ALIGNN 2.0 runs fully in native PyTorch. Set the model name to a `*_pure` variant
   (e.g. `alignn_atomwise_pure`) and `neighbor_strategy: "pure_torch"`. DGL is optional.
 - If you *do* use the legacy DGL path, install a DGL build matching your CUDA runtime;
   mismatched builds are the most common install failure.
@@ -544,14 +544,14 @@ single run on Alexandria.
 **Training hyperparameters**
 
 - Example configs ship with a small `batch_size`/`epochs` so tests run fast. **Use
-  `batch_size: 32`–`64` and `epochs: 100`–`300` for real trainings** — otherwise
+  `batch_size: 32`–`64` and `epochs: 100`–`300` for real trainings**; otherwise
   training is slow and under-performing.
 - `pandas >= 1.2.3` required. Since March 2024, `pytorch-ignite` is no longer a dependency.
 
 **CLIs are importable scripts**
 
 - `train_alignn.py`, `pretrained.py`, and `run_alignn_ff.py` install as executables in
-  your environment's `bin/` — just run them by name, no absolute path needed.
+  your environment's `bin/`, so just run them by name, no absolute path needed.
 
 **Known dataset issues**
 
