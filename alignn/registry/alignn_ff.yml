@@ -1,35 +1,6 @@
 # ALIGNN force-field models.
 # figshare_ff: name -> zip url (alignn.ff get_figshare_model_ff)
 # alignn2: ALIGNN 2.0 entries by category (alignn.pretrained.get_alignn2_model)
-figshare_ff:
-  dft_3d_307k: https://ndownloader.figshare.com/files/64744104
-  mps: https://ndownloader.figshare.com/files/64744107
-  v12.2.2024_dft_3d_307k: https://ndownloader.figshare.com/files/50904240
-  v12.2.2024_mp_1.5mill: https://ndownloader.figshare.com/files/50904783
-  v12.2.2024_mp_187k: https://ndownloader.figshare.com/files/50904801
-  v10.30.2024_dft_3d_307k: https://ndownloader.figshare.com/files/50634327
-  v10.30.2024_mp_168k: https://ndownloader.figshare.com/files/50634318
-  v8.29.2024_dft_3d: https://ndownloader.figshare.com/files/48889834
-  v8.29.2024_mpf: https://ndownloader.figshare.com/files/48889837
-  v5.27.2024: https://ndownloader.figshare.com/files/47286127
-  alignnff_fmult: https://ndownloader.figshare.com/files/41583585
-  alignnff_wt10: https://ndownloader.figshare.com/files/41583594
-  alignnff_fd: https://ndownloader.figshare.com/files/41583582
-  alignnff_wt01: https://ndownloader.figshare.com/files/41583588
-  alignnff_wt1: https://ndownloader.figshare.com/files/41583591
-  fmult_mlearn_only: https://ndownloader.figshare.com/files/41583597
-  aff_Oct23: https://ndownloader.figshare.com/files/42880573
-  revised: https://ndownloader.figshare.com/files/41583600
-  scf_fd_top_10_en_42_fmax_600_wt01: https://ndownloader.figshare.com/files/41967375
-  scf_fd_top_10_en_42_fmax_600_wt10: https://ndownloader.figshare.com/files/41967372
-  matpes_pbe: https://ndownloader.figshare.com/files/70840662
-  matpes_r2scan: https://ndownloader.figshare.com/files/70840338
-  matpes_pbe_old: https://ndownloader.figshare.com/files/67217507
-  matpes_r2scan_old: https://ndownloader.figshare.com/files/67360764
-  alignn_ff_mptrj: https://ndownloader.figshare.com/files/70840341
-  alignn_ff_matpes_pbe: https://ndownloader.figshare.com/files/70840662
-  alignn_ff_matpes_r2scan: https://ndownloader.figshare.com/files/70840338
-  alignn_ff_omat24_1m: https://ndownloader.figshare.com/files/70840344
 alignn2:
   forcefield:
     alignn_ff_db:
@@ -164,3 +135,33 @@ alignn2:
       url: https://ndownloader.figshare.com/files/67163333
       description: 'Previous model (before 2026.10.15): Universal force field trained on MPtrj (~1.5M configs, ep46).'
       training_data: ''
+
+figshare_ff:
+  dft_3d_307k: https://ndownloader.figshare.com/files/64744104
+  mps: https://ndownloader.figshare.com/files/64744107
+  v12.2.2024_dft_3d_307k: https://ndownloader.figshare.com/files/50904240
+  v12.2.2024_mp_1.5mill: https://ndownloader.figshare.com/files/50904783
+  v12.2.2024_mp_187k: https://ndownloader.figshare.com/files/50904801
+  v10.30.2024_dft_3d_307k: https://ndownloader.figshare.com/files/50634327
+  v10.30.2024_mp_168k: https://ndownloader.figshare.com/files/50634318
+  v8.29.2024_dft_3d: https://ndownloader.figshare.com/files/48889834
+  v8.29.2024_mpf: https://ndownloader.figshare.com/files/48889837
+  v5.27.2024: https://ndownloader.figshare.com/files/47286127
+  alignnff_fmult: https://ndownloader.figshare.com/files/41583585
+  alignnff_wt10: https://ndownloader.figshare.com/files/41583594
+  alignnff_fd: https://ndownloader.figshare.com/files/41583582
+  alignnff_wt01: https://ndownloader.figshare.com/files/41583588
+  alignnff_wt1: https://ndownloader.figshare.com/files/41583591
+  fmult_mlearn_only: https://ndownloader.figshare.com/files/41583597
+  aff_Oct23: https://ndownloader.figshare.com/files/42880573
+  revised: https://ndownloader.figshare.com/files/41583600
+  scf_fd_top_10_en_42_fmax_600_wt01: https://ndownloader.figshare.com/files/41967375
+  scf_fd_top_10_en_42_fmax_600_wt10: https://ndownloader.figshare.com/files/41967372
+  matpes_pbe: https://ndownloader.figshare.com/files/70840662
+  matpes_r2scan: https://ndownloader.figshare.com/files/70840338
+  matpes_pbe_old: https://ndownloader.figshare.com/files/67217507
+  matpes_r2scan_old: https://ndownloader.figshare.com/files/67360764
+  alignn_ff_mptrj: https://ndownloader.figshare.com/files/70840341
+  alignn_ff_matpes_pbe: https://ndownloader.figshare.com/files/70840662
+  alignn_ff_matpes_r2scan: https://ndownloader.figshare.com/files/70840338
+  alignn_ff_omat24_1m: https://ndownloader.figshare.com/files/70840344
