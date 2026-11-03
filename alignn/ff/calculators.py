@@ -301,6 +301,11 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
 
     def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
+        # Record the atoms, so ASE reuses results for an unchanged structure.
+        ase.calculators.calculator.Calculator.calculate(
+            self, atoms, properties, system_changes
+        )
+        self.results = {}
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
         g, lg = Graph.atom_dgl_multigraph(
@@ -396,10 +401,11 @@ class AlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
             forces *= self.config["batch_size"]
 
         # print("stress cal",stress)
+        # ASE readers such as ase.db assume float64 arrays.
         self.results = {
             "energy": energy,
-            "forces": forces,
-            "stress": stress,
+            "forces": np.asarray(forces, dtype=np.float64),
+            "stress": np.asarray(stress, dtype=np.float64),
         }
         # print("self.results",self.results)
 
@@ -515,6 +521,11 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
     ):
         # def calculate(self, atoms, properties=None, system_changes=None):
         """Calculate properties."""
+        # Record the atoms, so ASE reuses results for an unchanged structure.
+        ase.calculators.calculator.Calculator.calculate(
+            self, atoms, properties, system_changes
+        )
+        self.results = {}
         j_atoms = ase_to_atoms(atoms)
         num_atoms = j_atoms.num_atoms
         g, lg = Graph.atom_dgl_multigraph(
@@ -563,12 +574,14 @@ class iAlignnAtomwiseCalculator(ase.calculators.calculator.Calculator):
         magmoms = [i[1] for i in atomwise]
 
         # print('additional',len(additional),len(self.props))
+        # ASE readers such as ase.db assume float64 arrays, and ASE only
+        # copies arrays when it returns cached results.
         results = {
             "energy": energy * num_atoms,
-            "forces": forces,
-            "stress": stress,
-            "charges": charges,
-            "magmoms": magmoms,
+            "forces": np.asarray(forces, dtype=np.float64),
+            "stress": np.asarray(stress, dtype=np.float64),
+            "charges": np.asarray(charges, dtype=np.float64),
+            "magmoms": np.asarray(magmoms, dtype=np.float64),
         }
         for i, j in zip(self.props, additional):
             results[i] = j
