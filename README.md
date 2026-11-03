@@ -15,10 +15,10 @@
 * [Reproducing a JARVIS-Leaderboard contribution](#reproduce)
 * [Colab notebooks](#colab)
 * [Pre-trained models](#pretrained)
-* [JARVIS-ALIGNN webapp](#webapp)
-* [ALIGNN-FF & ASE Calculator](#alignnff)
+* [Web-apps](#webapp)
+* [ALIGNN-FF ASE Calculator](#alignnff)
 * [Inverse design: generate structures](#inverse)
-* [Peformances on a few datasets](#performances)
+* [Performances](#performances)
 * [Useful notes](#notes)
 * [References](#refs)
 * [How to contribute](#contrib)
@@ -30,7 +30,7 @@
 
 The Atomistic Line Graph Neural Network ([paper](https://www.nature.com/articles/s41524-021-00650-1)) introduces a graph convolution layer that explicitly models both two- and three-body interactions in atomistic systems. The ALIGNN-FF variant ([paper](https://pubs.rsc.org/en/content/articlehtml/2023/dd/d2dd00096b)) extends this to a force-field for structurally and chemically diverse systems across 89 elements.
 
-![ALIGNN layer schematic](https://github.com/atomgptlab/alignn/blob/develop/alignn/tex/schematic_lg.jpg)
+![ALIGNN layer schematic](alignn/tex/schematic_lg.jpg)
 
 > ⚡ **Pure PyTorch: DGL is no longer required.** ALIGNN now runs fully in
 > native PyTorch. Neighbor lists, line graphs, and batched readout are all
@@ -225,7 +225,7 @@ training, and pretrained-model usage. Click a badge to open in Colab.
 | Miscellaneous training tasks | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/Training_ALIGNN_model_example.ipynb) | Single-output, multi-output (phonon/electron DOS), classification, and pretrained usage. |
 | Superconductor Tc | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_Sc.ipynb) | Train a model for superconductor transition temperature. |
 | Build `id_prop.json` from VASP runs | [![Open In Colab][colab-badge]](https://colab.research.google.com/gist/knc6/5513b21f5fd83a7943509ffdf5c3608b/make_id_prop.ipynb) | Compile `vasprun.xml` files into `id_prop.json` for ALIGNN-FF training. |
-| LAMMPS MD with ALIGNN-FF (`pair_alignn`) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_FF_LAMMPS_Colab.ipynb) | Build LAMMPS with the native `pair_alignn` style and run NVE / melt-quench MD with the default ALIGNN-FF `mps` force field. |
+| LAMMPS MD with ALIGNN-FF (`pair_alignn`) | [![Open In Colab][colab-badge]](https://colab.research.google.com/github/knc6/jarvis-tools-notebooks/blob/master/jarvis-tools-notebooks/ALIGNN_FF_LAMMPS_Colab.ipynb) | Build LAMMPS with the native `pair_alignn` style and run NVE / melt-quench MD with the ALIGNN-FF `mps` force field. |
 
 <a name="pretrained"></a>
 ## Using pre-trained models
@@ -326,13 +326,14 @@ from alignn.inverse.generate import ALIGNNGenerator
 gen = ALIGNNGenerator()          # default model, downloaded + cached once
 
 result = gen.generate("NbN", prop=16.0, num_candidates=8)   # Tc = 16 K
-print(result.best)        # GeneratedStructure(NNb, 2 atoms, E=-17.91 eV/atom, relaxed=True)
+print(result.best)        # GeneratedStructure(NNb, 2 atoms, E=-10.06 eV/atom, relaxed=True)
 print(result.to_poscar())
 print(result.atoms)       # jarvis Atoms -> feeds any other ALIGNN model
 ```
 
-For `NbN` this returns the rocksalt structure: N at `(0.436, 0.691, 0.674)` and
-Nb at `(0.936, 0.191, 0.174)`, a (½,½,½) offset.
+For `NbN` this returns the rocksalt structure (primitive cell, a ≈ 3.14 Å,
+angles ≈ 60°/120°) with N and Nb offset by (½,½,½). The absolute coordinates
+change from run to run, because the origin is arbitrary.
 
 Composition takes a formula, a counts dict, or an explicit atom list;
 `formula_units` asks for a bigger cell; omitting `prop` leaves the property
@@ -457,15 +458,19 @@ continually-updated numbers see the
 | 49 | `mlearn`-Si, energy (meV/atom) | 214/–/25 | 13.88‡ |   |   |   | – |   |
 | 50 | `mlearn`-Si, force (eV/Å) | 214/–/25 | 0.0872‡ |   |   |   | – |   |
 | 51 | ALIGNN-FF-DB (E/F) | 276,401/–/15,355 | 32.4 / 0.0564 |   |   |   | – |   |
-| 52 | MATPES-PBE (E/F) | 391,241/21,736/– | 40.4 / 0.1475 |   |   |   | – |   |
+| 52 | MATPES-PBE (E/F)† | 391,241/21,736/– | 40.4 / 0.1475 |   |   |   | – |   |
 | 53 | FD-FF, 1.1 M (E/F) | 1,097,227/60,957/60,958 | 28.9 / 0.0445 |   |   |   | – |   |
-| 54 | MPtrj (E/F, ep46) | ~1.5 M | 57.9 / 0.0721 |   |   |   | – |   |
+| 54 | MPtrj (E/F, ep46)† | ~1.5 M | 57.9 / 0.0721 |   |   |   | – |   |
 *Blank cells: not run for that graph/model. `–`: baseline unavailable or ill-defined.
-‡ `mlearn` MAE pending re-verification against a consistent per-atom energy convention.*
+‡ `mlearn` MAE pending re-verification against a consistent per-atom energy convention.
+† Earlier ALIGNN-FF releases (e.g. `mptrj_ff_old`), not the per-element-embedding models
+listed under [Pretrained force fields](#alignnff).*
 
 **(d) Universal force fields: Matbench-Discovery / WBM (full 256,963-material set)**
 
-Five ALIGNN-FF (AFF) variants share one architecture; UMA / M3GNet / MACE-MP-0 /
+Five earlier ALIGNN-FF (AFF) releases share one architecture (e.g. `mptrj_ff_old`,
+`matpes_r2scan_ff_old`); the per-element-embedding models now used by default (see
+[Pretrained force fields](#alignnff)) are not yet benchmarked here. UMA / M3GNet / MACE-MP-0 /
 CHGNet are external baselines run through the identical pipeline. Stability F1 and
 discovery-acceleration DAF are higher-is-better; geometry-optimization RMSD, formation
 MAE, and diatomic tortuosity τ (ideal 1) are lower-is-better.
@@ -484,7 +489,7 @@ MAE, and diatomic tortuosity τ (ideal 1) are lower-is-better.
 
 **(e) Universal force fields: CHIPS-FF material properties** (MAE vs JARVIS-DFT; single relax-and-evaluate)
 
-Lattice `a,c`; formation `E_f`; elastic `C11,C44,Kv`; monovacancy (Vac) and surface (Surf) energies.
+AFF rows are the same earlier releases as in (d). Lattice `a,c`; formation `E_f`; elastic `C11,C44,Kv`; monovacancy (Vac) and surface (Surf) energies.
 
 | Model | a (Å) | c (Å) | E_f (eV/at) | C11 (GPa) | C44 (GPa) | Kv (GPa) | Vac (eV) | Surf (J/m²) |
 |---|---|---|---|---|---|---|---|---|
