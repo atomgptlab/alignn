@@ -88,12 +88,15 @@ class AlignnFFRelaxer:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 opt = FIRE(target, logfile=None)
-                opt.run(fmax=self.fmax, steps=self.steps)
+                converged = opt.run(fmax=self.fmax, steps=self.steps)
+                if converged is None:  # ASE < 3.22 returned nothing
+                    forces = target.get_forces()
+                    converged = (forces**2).sum(axis=1).max() <= self.fmax**2
                 energy = float(ase_atoms.get_potential_energy()) / n
             return RelaxResult(
                 atoms=ase_to_atoms(ase_atoms),
                 energy_per_atom=energy,
-                converged=bool(opt.converged()),
+                converged=bool(converged),
                 steps=int(opt.get_number_of_steps()),
             )
         except Exception as exc:  # noqa: BLE001
