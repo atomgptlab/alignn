@@ -57,7 +57,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840662
       description: ALIGNN-FF with per-element embedding trained on MatPES-PBE. PBE energy scale. Test MAE 26.3 meV/atom (E) / 0.101 eV/A (F) / 0.528 GPa (S).
-      training_data: ''
+      training_data: https://ndownloader.figshare.com/files/71135595
     matpes_r2scan_ff:
       graph: radius
       cutoff: 5.0
@@ -68,7 +68,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840338
       description: 'ALIGNN-FF with per-element embedding trained on MatPES-r2SCAN. Test MAE 25.5 meV/atom (E) / 0.128 eV/A (F) / 0.593 GPa (S). NOTE: raw r2SCAN total-energy scale (not PBE) — absolute energies/formation differ from PBE models.'
-      training_data: ''
+      training_data: https://ndownloader.figshare.com/files/71135592
     omat24_1m_ff:
       graph: radius
       cutoff: 5.0
@@ -79,7 +79,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840344
       description: ALIGNN-FF with per-element embedding trained on OMat24 (1M subset). Test MAE 28.1 meV/atom (E) / 0.106 eV/A (F) / 0.737 GPa (S).
-      training_data: ''
+      training_data: https://ndownloader.figshare.com/files/71135601
     mlearn_si:
       graph: radius
       cutoff: 5.0
@@ -101,7 +101,7 @@ alignn2:
       figshare_article_id: 34846446
       url: https://ndownloader.figshare.com/files/70840341
       description: 'DEFAULT ALIGNN-FF: per-element embedding, trained on MPtrj (~1.5M configs). Test MAE 17.9 meV/atom (E) / 0.0586 eV/A (F) / 0.288 GPa (S).'
-      training_data: ''
+      training_data: https://ndownloader.figshare.com/files/41619375  # original MPtrj file, make_mptrj_ff_dataset.py in figshare 34925925 converts it
     matpes_pbe_ff_old:
       graph: radius
       cutoff: 5.0
