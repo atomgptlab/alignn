@@ -1071,7 +1071,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945629
       description: JARVIS-DFT formation_energy_peratom (knn graph), JARVIS leaderboard entry. Test MAE 0.02836 eV/atom.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135577
     optb88vdw_bandgap_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1082,7 +1082,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945692
       description: JARVIS-DFT optb88vdw_bandgap (knn graph), JARVIS leaderboard entry. Test MAE 0.1245 eV.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135586
     mbj_bandgap_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1093,7 +1093,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945674
       description: JARVIS-DFT mbj_bandgap (knn graph), JARVIS leaderboard entry. Test MAE 0.2576 eV.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135580
     optb88vdw_total_energy_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1104,7 +1104,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945695
       description: JARVIS-DFT optb88vdw_total_energy (knn graph), JARVIS leaderboard entry. Test MAE 0.02965 eV/atom.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135589
     ehull_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1115,7 +1115,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945653
       description: JARVIS-DFT ehull (knn graph), JARVIS leaderboard entry. Test MAE 0.05136 eV/atom.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135571
     bulk_modulus_kv_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1126,7 +1126,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945641
       description: JARVIS-DFT bulk_modulus_kv (knn graph), JARVIS leaderboard entry. Test MAE 9.242 GPa.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135562
     max_efg_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1137,7 +1137,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945671
       description: JARVIS-DFT max_efg (knn graph), trained on the JARVIS leaderboard dft_3d split. Test MAE 19.18 (10^21 V/m^2).
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135574
     spillage_knn_lb:
       graph: knn
       cutoff: 8.0
@@ -1148,7 +1148,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945707
       description: JARVIS-DFT spillage (knn graph), JARVIS leaderboard entry. Test MAE 0.3408.
-      training_data: https://ndownloader.figshare.com/files/64391379
+      training_data: https://ndownloader.figshare.com/files/71135583
     oqmd_formation_energy_peratom_knn:
       graph: knn
       cutoff: 8.0
@@ -1159,7 +1159,7 @@ alignn2:
       figshare_article_id: 34875336
       url: https://ndownloader.figshare.com/files/70945626
       description: OQMD v1.8 formation_energy_peratom (knn graph), random 90/5/5 split. Test MAE 0.0120 eV/atom.
-      training_data: ''
+      training_data: https://ndownloader.figshare.com/files/71135598
   spectra:
     a2f:
       graph: radius
