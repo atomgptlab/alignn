@@ -13,26 +13,11 @@ alignn2:
       conditioning:
       - composition
       - Tc_supercon
-      match_rate: 0.524
-      rmsd: 0.056
-      figshare_article_id: 33315741
-      url: https://ndownloader.figshare.com/files/67768725
-      description: ALIGNN-CSP trained from scratch on AtomBench JARVIS Supercon-3D; best single benchmark run.
-      training_data: https://ndownloader.figshare.com/files/38307921
-    csp_supercon_jarvis_pt:
-      graph: dense
-      cutoff: 0.0
-      output_features: 0
-      target: structure
-      unit: ''
-      conditioning:
-      - composition
-      - Tc_supercon
-      match_rate: 0.515
-      rmsd: 0.023
-      figshare_article_id: 33315744
-      url: https://ndownloader.figshare.com/files/67768728
-      description: ALIGNN-CSP on JARVIS Supercon-3D, fine-tuned from csp_pretrain_dft3d; best coordinate accuracy.
+      match_rate: 0.4466
+      rmsd: 0.0436
+      figshare_article_id: 35079457
+      url: https://ndownloader.figshare.com/files/71707198
+      description: ALIGNN-CSP (line-graph, no angular objective) trained from scratch on AtomBench JARVIS Supercon-3D; 32-candidate workflow with ALIGNN-FF relaxation and crystallographic post-processing.
       training_data: https://ndownloader.figshare.com/files/38307921
     csp_supercon_alex:
       graph: dense
@@ -43,11 +28,11 @@ alignn2:
       conditioning:
       - composition
       - Tc
-      match_rate: 0.485
-      rmsd: 0.028
-      figshare_article_id: 33315747
-      url: https://ndownloader.figshare.com/files/67768731
-      description: ALIGNN-CSP on AtomBench Alexandria DS-A/B superconductors, fine-tuned from csp_pretrain_dft3d.
+      match_rate: 0.5661
+      rmsd: 0.0253
+      figshare_article_id: 35079472
+      url: https://ndownloader.figshare.com/files/71707204
+      description: ALIGNN-CSP (line-graph, no angular objective) on AtomBench Alexandria DS-A/B superconductors, fine-tuned from csp_pretrain_dft3d; 32-candidate workflow with ALIGNN-FF relaxation and crystallographic post-processing.
       training_data: https://ndownloader.figshare.com/files/55551155
     csp_pretrain_dft3d:
       graph: dense
